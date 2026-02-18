@@ -1,5 +1,5 @@
 # fire-learning119Y
-e-Learning119Q  救急業務
+e-Learning119Y  消防業務
 <style>
   body {
     background: linear-gradient(180deg, #001f3f 0%, #f0f3f8 100%);
@@ -193,7 +193,7 @@ e-Learning119Q  救急業務
   </div>
 
   <div class="divider"></div>
-  <footer>© 2025 救急業務教育サポート / 作成：Naoki</footer>
+  <footer>© 2026 消防業務教育サポート / 作成：Naoki</footer>
 </div>
 
 e-Learning119Y
