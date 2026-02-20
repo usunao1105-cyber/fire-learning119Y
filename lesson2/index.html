@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>消防団員向け 安全確保eラーニング</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel (to compile JSX in the browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- インラインSVGアイコンコンポーネント ---
+    // (lucide-reactの代わりに、ブラウザ単体で動くようにSVGを直接定義)
+    const Shield = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+    );
+    const CheckCircle = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    );
+    const XCircle = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+    );
+    const RotateCcw = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+    );
+    const Award = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+    );
+    const AlertTriangle = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+    );
+    const ChevronRight = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="9 18 15 12 9 6"></polyline></svg>
+    );
+
+    // --- 問題データプール ---
+    const ALL_QUESTIONS = [
+      {
+        id: 1,
+        text: "大規模災害時、消防団員が最優先すべき行動は何ですか？",
+        options: [
+          "自分の命、家族の命を守るための避難行動",
+          "住民の財産を守るための消火活動",
+          "役場への迅速な参集と待機"
+        ],
+        correctAnswer: 0,
+        explanation: "消防団員を含めたすべての人が「自分の命、家族の命を守る」ための避難行動を最優先とすることが基本ルールです。"
+      },
+      {
+        id: 2,
+        text: "津波浸水想定区域内の消防団は、気象庁から津波に係る情報が公表されるまで原則としてどう行動すべきですか？",
+        options: [
+          "現場に急行し情報収集を行う",
+          "原則として退避を優先する",
+          "高台から海側の警戒監視を行う"
+        ],
+        correctAnswer: 1,
+        explanation: "津波浸水想定区域内にある消防団は、気象庁から津波に係る情報が公表されるまでは、原則として退避を優先します。"
+      },
+      {
+        id: 3,
+        text: "津波災害時等の「活動可能時間」は、出動から津波到達予想時刻までの時間から何を差し引いて設定されますか？",
+        options: [
+          "休憩時間と事前のミーティング時間",
+          "退避に要する時間と安全確保のための余裕時間",
+          "住民の避難誘導にかかる時間"
+        ],
+        correctAnswer: 1,
+        explanation: "出動から到達予想時刻までの時間から、「退避に要する時間」と「安全確保のための余裕時間（安全時間）」を差し引いた時間を「活動可能時間」として設定します。"
+      },
+      {
+        id: 4,
+        text: "設定された「活動可能時間」が経過した場合、どのように行動すべきですか？",
+        options: [
+          "活動の途中であっても直ちに退避する",
+          "現在の作業が完了するまで活動を継続する",
+          "自己判断で安全を確認しながら活動を続ける"
+        ],
+        correctAnswer: 0,
+        explanation: "活動可能時間が経過した場合は、活動の途中であっても直ちに退避命令が出され、退避しなければなりません。"
+      },
+      {
+        id: 5,
+        text: "災害現場での活動において、重大な事故につながるため原則禁止されていることは何ですか？",
+        options: [
+          "夜間の活動",
+          "車両の乗り入れ",
+          "単独行動"
+        ],
+        correctAnswer: 2,
+        explanation: "災害現場での単独行動は重大な事故につながるため原則禁止されています。活動する際は必ず2〜5名程度の「隊」として複数人で行動します。"
+      },
+      {
+        id: 6,
+        text: "車両から離れて活動する場合、車両での連絡や周囲の警戒のためにどうすべきですか？",
+        options: [
+          "全員で現場に向かい、車両には鍵をかける",
+          "原則1名は車両に残る",
+          "近くの住民に車両の監視を依頼する"
+        ],
+        correctAnswer: 1,
+        explanation: "車両から離れて活動する場合でも、原則1名は車両に残り、連絡や周囲の警戒にあたります。"
+      },
+      {
+        id: 7,
+        text: "津波到達予想時間が短く危険が迫っている場合、水門や陸閘（りっこう）の閉鎖作業はどうすべきですか？",
+        options: [
+          "危険が迫っていても最後まで必ず閉鎖を完了させる",
+          "作業を放棄して自らの退避と住民の避難を優先する",
+          "作業を中断し、次の指示が来るまでその場で待機する"
+        ],
+        correctAnswer: 1,
+        explanation: "水門や陸閘の閉鎖作業を担当している場合でも、作業を放棄して自らの退避と住民の避難を優先することがルール化されています。"
+      },
+      {
+        id: 8,
+        text: "活動中に指揮本部と連絡が取れない状態になった場合、どう行動すべきですか？",
+        options: [
+          "連絡が取れるまでその場で待機し続ける",
+          "任務を継続しながら連絡が取れる場所を探す",
+          "周囲の状況に注意し、速やかに安全なところへ退避する"
+        ],
+        correctAnswer: 2,
+        explanation: "もし指揮本部と連絡が取れない状態になった場合は、周囲の状況に注意し、速やかに安全なところへ退避します。"
+      },
+      {
+        id: 9,
+        text: "活動中の情報伝達手段として、常に携行すべきものは何ですか？",
+        options: [
+          "無線機やトランシーバーなどの双方向通信機器やラジオ",
+          "大音量のメガホンのみ",
+          "特に指定はなく、自身のスマートフォンがあればよい"
+        ],
+        correctAnswer: 0,
+        explanation: "活動中は常に無線機やトランシーバーなどの双方向通信機器やラジオを携行し、指揮命令系統からの情報を得られるようにします。"
+      },
+      {
+        id: 10,
+        text: "津波の恐れがある地域での活動において、必ず着用が義務付けられているものは何ですか？",
+        options: [
+          "耐火服",
+          "ライフジャケット",
+          "防毒マスク"
+        ],
+        correctAnswer: 1,
+        explanation: "活動環境に応じた適切な装備を身につけることが自己防衛の第一歩であり、津波の恐れがある地域ではライフジャケットの着用が義務付けられています。"
+      }
+    ];
+
+    const shuffleArray = (array) => {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    function App() {
+      const [questions, setQuestions] = useState([]);
+      const [answers, setAnswers] = useState({});
+      const [isSubmitted, setIsSubmitted] = useState(false);
+      const [score, setScore] = useState(0);
+
+      const initializeQuiz = () => {
+        const selectedQuestions = shuffleArray(ALL_QUESTIONS).slice(0, 5);
+        setQuestions(selectedQuestions);
+        setAnswers({});
+        setIsSubmitted(false);
+        setScore(0);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      useEffect(() => {
+        initializeQuiz();
+      }, []);
+
+      const handleOptionSelect = (questionId, optionIndex) => {
+        if (isSubmitted) return;
+        setAnswers(prev => ({ ...prev, [questionId]: optionIndex }));
+      };
+
+      const handleSubmit = () => {
+        let currentScore = 0;
+        questions.forEach(q => {
+          if (answers[q.id] === q.correctAnswer) {
+            currentScore++;
+          }
+        });
+        setScore(currentScore);
+        setIsSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      const allAnswered = questions.length > 0 && questions.every(q => answers[q.id] !== undefined);
+
+      return (
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-amber-200">
+          {/* Header */}
+          <header className="bg-slate-900 text-amber-50 py-8 px-4 shadow-md border-b-4 border-amber-600">
+            <div className="max-w-4xl mx-auto flex items-center gap-4">
+              <Shield className="w-10 h-10 text-amber-500" />
+              <div>
+                <h1 className="text-2xl md:text-3xl font-serif font-bold tracking-wider">消防団員 安全確保プログラム</h1>
+                <p className="text-slate-300 text-sm md:text-base mt-1 tracking-wide">
+                  第1章：大規模災害・津波発生時の退避ルール
+                </p>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-4xl mx-auto py-10 px-4">
+            {/* Intro / Philosophy */}
+            {!isSubmitted && (
+              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-amber-600"></div>
+                <div className="flex items-start gap-4">
+                  <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-1" />
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800 mb-2">基本理念</h2>
+                    <p className="text-slate-600 leading-relaxed font-serif">
+                      「消防団員が自らの命を守ることが、その後の消防活動においてより多くの命を救う基本である。」<br/>
+                      <span className="text-sm mt-2 block text-slate-500">
+                        ※出題される5つの設問に解答し、知識の確認を行ってください。
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Results Banner */}
+            {isSubmitted && (
+              <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8 mb-10 text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-slate-900"></div>
+                <Award className={`w-16 h-16 mx-auto mb-4 ${score === 5 ? 'text-amber-500' : 'text-slate-400'}`} />
+                <h2 className="text-3xl font-serif font-bold text-slate-900 mb-2">判定結果</h2>
+                <div className="text-5xl font-light text-slate-800 mb-4">
+                  {score} <span className="text-2xl text-slate-500">/ 5 問正解</span>
+                </div>
+                {score === 5 ? (
+                  <p className="text-emerald-600 font-bold bg-emerald-50 py-2 px-4 rounded-full inline-block">
+                    素晴らしい成績です。安全確保の原則を正しく理解されています。
+                  </p>
+                ) : (
+                  <p className="text-amber-700 font-bold bg-amber-50 py-2 px-4 rounded-full inline-block">
+                    誤った箇所を確認し、自身の命を守るルールを再確認してください。
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Questions List */}
+            <div className="space-y-8">
+              {questions.map((q, index) => {
+                const isAnswered = answers[q.id] !== undefined;
+                const isCorrect = answers[q.id] === q.correctAnswer;
+                
+                return (
+                  <div 
+                    key={q.id} 
+                    className={`bg-white rounded-xl shadow-md border overflow-hidden transition-all duration-300 ${
+                      isSubmitted 
+                        ? isCorrect 
+                          ? 'border-emerald-200 ring-1 ring-emerald-100' 
+                          : 'border-red-200 ring-1 ring-red-100'
+                        : isAnswered 
+                          ? 'border-slate-300' 
+                          : 'border-slate-200'
+                    }`}
+                  >
+                    <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex gap-4 items-start">
+                      <span className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-900 text-amber-50 font-serif font-bold flex-shrink-0">
+                        {index + 1}
+                      </span>
+                      <h3 className="text-lg font-medium text-slate-800 leading-relaxed pt-1">
+                        {q.text}
+                      </h3>
+                    </div>
+
+                    <div className="p-6">
+                      <div className="space-y-3">
+                        {q.options.map((option, optIdx) => {
+                          const isSelected = answers[q.id] === optIdx;
+                          const isOptionCorrect = optIdx === q.correctAnswer;
+                          
+                          let optionClasses = "relative flex items-center p-4 border rounded-lg cursor-pointer transition-all duration-200 ";
+                          
+                          if (!isSubmitted) {
+                            optionClasses += isSelected 
+                              ? "bg-slate-900 border-slate-900 text-white shadow-md" 
+                              : "bg-white border-slate-200 text-slate-700 hover:border-amber-500 hover:bg-amber-50";
+                          } else {
+                            optionClasses += "cursor-default ";
+                            if (isOptionCorrect) {
+                              optionClasses += "bg-emerald-50 border-emerald-500 text-emerald-900 font-medium ";
+                            } else if (isSelected && !isOptionCorrect) {
+                              optionClasses += "bg-red-50 border-red-300 text-red-800 ";
+                            } else {
+                              optionClasses += "bg-white border-slate-100 text-slate-400 opacity-60 ";
+                            }
+                          }
+
+                          return (
+                            <div 
+                              key={optIdx} 
+                              onClick={() => handleOptionSelect(q.id, optIdx)}
+                              className={optionClasses}
+                            >
+                              <div className="flex-1 pr-8">{option}</div>
+                              
+                              {!isSubmitted && (
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                  isSelected ? 'border-amber-400' : 'border-slate-300'
+                                }`}>
+                                  {isSelected && <div className="w-2.5 h-2.5 bg-amber-400 rounded-full" />}
+                                </div>
+                              )}
+
+                              {isSubmitted && isOptionCorrect && (
+                                <CheckCircle className="absolute right-4 w-6 h-6 text-emerald-600" />
+                              )}
+                              {isSubmitted && isSelected && !isOptionCorrect && (
+                                <XCircle className="absolute right-4 w-6 h-6 text-red-500" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {isSubmitted && (
+                        <div className="mt-6 p-5 bg-slate-50 border border-slate-200 rounded-lg">
+                          <h4 className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2">
+                            <ChevronRight className="w-4 h-4 text-amber-600" />
+                            解説
+                          </h4>
+                          <p className="text-slate-600 text-sm leading-relaxed">
+                            {q.explanation}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-12 flex flex-col items-center gap-4">
+              {!isSubmitted ? (
+                <>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={!allAnswered}
+                    className={`
+                      px-12 py-4 rounded-full font-bold text-lg shadow-lg transition-all duration-300 w-full md:w-auto
+                      ${allAnswered 
+                        ? 'bg-slate-900 text-amber-50 hover:bg-slate-800 hover:shadow-xl transform hover:-translate-y-1' 
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    採点する
+                  </button>
+                  {!allAnswered && (
+                    <p className="text-sm text-slate-500 font-medium">すべての設問に回答してください</p>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={initializeQuiz}
+                  className="group flex items-center justify-center gap-2 px-10 py-4 bg-white border-2 border-slate-900 text-slate-900 rounded-full font-bold text-lg hover:bg-slate-50 hover:text-amber-700 hover:border-amber-700 transition-all shadow-md w-full md:w-auto"
+                >
+                  <RotateCcw className="w-5 h-5 group-hover:-rotate-180 transition-transform duration-500" />
+                  再挑戦する
+                </button>
+              )}
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="bg-slate-900 text-slate-400 py-6 text-center text-sm border-t border-slate-800 mt-12">
+            <p>© 消防団員 安全確保eラーニング</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
