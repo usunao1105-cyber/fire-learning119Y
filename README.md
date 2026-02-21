@@ -109,13 +109,13 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 2</div>
-      <div class="lesson-desc">メディカルラリー評価ツール</div>
+      <div class="lesson-desc">消防団員安全管理ツール</div>
       <a href="lesson2/index.html" class="button">▶ 学習する</a>
     </div>
 
     <div class="card">
       <div class="lesson-title">Lesson 3</div>
-      <div class="lesson-desc">多言語 医療トリアージ案内ツール</div>
+      <div class="lesson-desc">メディカルラリー評価ツール</div>
       <a href="lesson3/index.html" class="button">▶ 学習する</a>
     </div>
 
