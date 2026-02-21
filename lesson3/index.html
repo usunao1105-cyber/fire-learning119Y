@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>メディカルラリー評価ツール</title>
+  
+  <!-- Tailwind CSS (スタイリング用) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM (UI構築用) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (ブラウザ内でReactコードを動かすため) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const Activity = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>);
+    const AlertTriangle = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>);
+    const Clock = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>);
+    const Heart = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>);
+    const CheckCircle = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>);
+    const XCircle = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>);
+    const ArrowLeft = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>);
+    const Settings = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"></path></svg>);
+    const List = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>);
+    const Volume2 = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>);
+    const VolumeX = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>);
+
+    const SCENARIO_DB = [
+      {
+        id: 'burn',
+        title: '爆発事故 / 多発外傷・気道熱傷',
+        description: '【事案発生】爆発事故現場に到着。傷病者は顔面に熱傷あり。嗄声（させい）を認める。活動開始！',
+        goalTime: 600,
+        initialHp: 100,
+        actions: [
+          { id: 'safety', name: '現場の安全確認・感染防御', targetTime: null, penalty: 10 },
+          { id: 'primary', name: '初期評価 (ABCDE)', targetTime: 60, penalty: 20 },
+          { id: 'oxygen', name: '酸素投与 (10L/分)', targetTime: 60, penalty: 10 },
+          { id: 'bvm', name: 'BVM換気', targetTime: null, penalty: 10 },
+          { id: 'intubation', name: '気管挿管', targetTime: 180, penalty: 20 },
+          { id: 'surgical_airway', name: '外科的気道確保', targetTime: null, penalty: 10 },
+          { id: 'iv', name: '静脈路確保・採血', targetTime: null, penalty: 10 },
+          { id: 'io', name: '骨髄路確保 (IO)', targetTime: null, penalty: 10 },
+          { id: 'fluid', name: '急速輸液', targetTime: null, penalty: 10 },
+          { id: 'chest_tube', name: '胸腔ドレナージ', targetTime: null, penalty: 10 },
+          { id: 'pelvic_binder', name: '骨盤固定', targetTime: null, penalty: 10 },
+          { id: 'txa', name: 'トラネキサム酸投与', targetTime: null, penalty: 10 },
+          { id: 'adrenaline', name: 'アドレナリン投与', targetTime: null, penalty: 10 },
+          { id: 'defib', name: '除細動', targetTime: null, penalty: 20 },
+          { id: 'thoracotomy', name: '開胸心臓マッサージ', targetTime: null, penalty: 10 },
+        ],
+        audioEvents: [
+          { time: 5, text: 'あつい！顔がすごく痛いです！' },
+          { time: 60, text: '息が…苦しいです…。声が、かすれます…。' },
+          { time: 180, text: 'ゼー…ゼー…（呼吸が極めて苦しい様子）' },
+        ],
+        calculateDamage: (currentTime, currentHp, actions) => {
+          let damageRate = 0.5;
+          const oxygenAction = actions.find(a => a.id === 'oxygen');
+          const intubationAction = actions.find(a => a.id === 'intubation');
+
+          if (intubationAction?.status === 'success') {
+            damageRate = 0; 
+          } else {
+            if (oxygenAction?.status === 'success') damageRate = 0.2; 
+            if (currentTime > 60 && oxygenAction?.status !== 'success') damageRate += 1.0; 
+            if (currentTime > 180 && intubationAction?.status !== 'success') damageRate += 2.5; 
+          }
+          return Math.max(0, currentHp - damageRate);
+        }
+      },
+      {
+        id: 'anaphylaxis',
+        title: 'アナフィラキシーショック',
+        description: '【事案発生】飲食店内で食事中の客が突然の呼吸困難と全身の蕁麻疹を訴え倒れた。血圧低下あり。活動開始！',
+        goalTime: 600,
+        initialHp: 80,
+        actions: [
+          { id: 'safety', name: '現場の安全確認・感染防御', targetTime: null, penalty: 10 },
+          { id: 'primary', name: '初期評価 (ABCDE)', targetTime: 60, penalty: 20 },
+          { id: 'adrenaline', name: 'アドレナリン筋注 (0.3mg)', targetTime: 180, penalty: 20 },
+          { id: 'oxygen', name: '酸素投与 (10L/分)', targetTime: 120, penalty: 10 },
+          { id: 'iv', name: '静脈路確保・輸液', targetTime: 300, penalty: 10 },
+          { id: 'antihistamine', name: '抗ヒスタミン薬投与', targetTime: null, penalty: 10 },
+          { id: 'steroid', name: 'ステロイド投与', targetTime: null, penalty: 10 },
+          { id: 'intubation', name: '気管挿管 (気道浮腫増悪時)', targetTime: null, penalty: 10 },
+        ],
+        audioEvents: [
+          { time: 5, text: '急に、息ができない…苦しい…' },
+          { time: 60, text: '体中が、痒くて、熱いです…' },
+          { time: 150, text: '目の前が、暗くなってきました…' },
+        ],
+        calculateDamage: (currentTime, currentHp, actions) => {
+          let damageRate = 0.8;
+          const adrenaline = actions.find(a => a.id === 'adrenaline');
+          if (adrenaline?.status === 'success') {
+            damageRate = 0;
+          } else {
+            if (currentTime > 180) damageRate += 2.0;
+          }
+          return Math.max(0, currentHp - damageRate);
+        }
+      },
+      {
+        id: 'ami',
+        title: '急性心筋梗塞',
+        description: '【事案発生】自宅で60代男性が突然の激しい胸痛を訴え救急要請。冷汗を伴い、苦悶様顔貌。活動開始！',
+        goalTime: 600,
+        initialHp: 100,
+        actions: [
+          { id: 'safety', name: '現場の安全確認・感染防御', targetTime: null, penalty: 10 },
+          { id: 'primary', name: '初期評価 (ABCDE)', targetTime: 60, penalty: 20 },
+          { id: 'oxygen', name: '酸素投与', targetTime: null, penalty: 10 },
+          { id: 'ecg12', name: '12誘導心電図測定', targetTime: 240, penalty: 10 },
+          { id: 'iv', name: '静脈路確保・採血', targetTime: null, penalty: 10 },
+          { id: 'aspirin', name: 'アスピリン投与（咀嚼）', targetTime: null, penalty: 10 },
+          { id: 'nitro', name: 'ニトログリセリン舌下投与', targetTime: null, penalty: 10 },
+          { id: 'hospital', name: 'PCI可能施設への早期連絡', targetTime: 420, penalty: 10 },
+        ],
+        audioEvents: [
+          { time: 5, text: 'ううっ、胸が押しつぶされそうだ！' },
+          { time: 60, text: '冷や汗が止まらない…' },
+          { time: 120, text: '背中の方まで痛いです…' },
+        ],
+        calculateDamage: (currentTime, currentHp, actions) => currentHp,
+      },
+      {
+        id: 'tbi',
+        title: '重症頭部外傷',
+        description: '【事案発生】建設現場で作業員が約5mの足場から転落。意識レベルJCS300(GCS5)。頭部から出血あり。活動開始！',
+        goalTime: 600,
+        initialHp: 100,
+        actions: [
+          { id: 'safety', name: '現場の安全確認・感染防御', targetTime: null, penalty: 10 },
+          { id: 'c_spine', name: '頸椎保護（用手・カラー）', targetTime: 60, penalty: 20 },
+          { id: 'primary', name: '初期評価 (ABCDE)', targetTime: 120, penalty: 20 },
+          { id: 'airway', name: '確実な気道確保（挿管・声門上）', targetTime: 300, penalty: 10 },
+          { id: 'oxygen', name: '十分な酸素投与（低酸素回避）', targetTime: null, penalty: 10 },
+          { id: 'gcs', name: 'GCS・瞳孔所見の評価', targetTime: null, penalty: 10 },
+          { id: 'iv', name: '静脈路確保・輸液（低血圧回避）', targetTime: null, penalty: 10 },
+          { id: 'backboard', name: '全身観察・バックボード固定', targetTime: 480, penalty: 10 },
+        ],
+        audioEvents: [
+          { time: 5, text: 'うー…、うー…（低い呻き声）' },
+          { time: 180, text: 'あー…、あー…（痛み刺激に対してのみ声が出る）' },
+          { time: 300, text: 'ゴロゴロ…（いびき様の呼吸音）' },
+        ],
+        calculateDamage: (currentTime, currentHp, actions) => currentHp,
+      },
+      {
+        id: 'hypoglycemia',
+        title: '低血糖発作',
+        description: '【事案発生】路上で高齢女性が倒れている。意識レベルJCS30。冷汗著明。所持品に糖尿病薬あり。活動開始！',
+        goalTime: 600,
+        initialHp: 100,
+        actions: [
+          { id: 'safety', name: '現場の安全確認・感染防御', targetTime: null, penalty: 10 },
+          { id: 'primary', name: '初期評価 (ABCDE)', targetTime: 60, penalty: 10 },
+          { id: 'glucose_check', name: '血糖値測定', targetTime: 180, penalty: 20 },
+          { id: 'iv', name: '静脈路確保', targetTime: 300, penalty: 10 },
+          { id: 'glucose_iv', name: 'ブドウ糖静注', targetTime: 360, penalty: 20 },
+          { id: 'reassessment', name: '意識レベル・バイタルの再評価', targetTime: null, penalty: 10 },
+        ],
+        audioEvents: [
+          { time: 5, text: 'ふわふわして、力が入らない…' },
+          { time: 60, text: '手がすごく震えます…' },
+          { time: 120, text: '目が回る…' },
+        ],
+        calculateDamage: (currentTime, currentHp, actions) => currentHp,
+      },
+      {
+        id: 'stroke',
+        title: '脳卒中 (CPSS評価)',
+        description: '【事案発生】家族からの通報。70代男性が突然呂律が回らなくなり、右半身に力が入らない。活動開始！',
+        goalTime: 600,
+        initialHp: 100,
+        actions: [
+          { id: 'safety', name: '現場の安全確認・感染防御', targetTime: null, penalty: 10 },
+          { id: 'primary', name: '初期評価 (ABCDE)', targetTime: 60, penalty: 10 },
+          { id: 'cpss', name: 'CPSS評価 (顔面・上肢・言語)', targetTime: 180, penalty: 20 },
+          { id: 'onset_time', name: '最終健常時刻（発症時刻）の確認', targetTime: 240, penalty: 20 },
+          { id: 'glucose_check', name: '血糖値測定（低血糖の除外）', targetTime: 300, penalty: 10 },
+          { id: 'oxygen', name: '酸素投与（SpO2低下時）', targetTime: null, penalty: 10 },
+          { id: 'iv', name: '静脈路確保', targetTime: null, penalty: 10 },
+          { id: 'hospital', name: '血栓溶解療法可能施設への早期連絡', targetTime: 420, penalty: 10 },
+        ],
+        audioEvents: [
+          { time: 5, text: 'あー、うー（呂律が回らない様子）' },
+          { time: 60, text: '右の手足が、痺れています…' },
+          { time: 120, text: '言葉が、うまく出ません…' },
+        ],
+        calculateDamage: (currentTime, currentHp, actions) => currentHp,
+      }
+    ];
+
+    function App() {
+      const [appMode, setAppMode] = useState('menu'); 
+      const [scenarios, setScenarios] = useState(SCENARIO_DB);
+      const [activeScenarioId, setActiveScenarioId] = useState(SCENARIO_DB[0].id);
+      const activeScenario = scenarios.find(s => s.id === activeScenarioId) || scenarios[0];
+
+      const [gameState, setGameState] = useState('ready');
+      const [timeElapsed, setTimeElapsed] = useState(0);
+      const [hp, setHp] = useState(100);
+      const [logs, setLogs] = useState([]);
+      const [actions, setActions] = useState([]);
+      
+      const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+
+      const handleSelectScenario = (scenario) => {
+        setActiveScenarioId(scenario.id);
+      };
+
+      const handleDescriptionChange = (e) => {
+        const newDescription = e.target.value;
+        setScenarios(prevScenarios => 
+          prevScenarios.map(scenario => 
+            scenario.id === activeScenarioId 
+              ? { ...scenario, description: newDescription }
+              : scenario
+          )
+        );
+      };
+
+      // メニュー画面でシナリオの目標時間を変更する処理
+      const handleScenarioTargetTimeChange = (actionId, newTimeStr) => {
+        setScenarios(prevScenarios => 
+          prevScenarios.map(scenario => {
+            if (scenario.id === activeScenarioId) {
+              return {
+                ...scenario,
+                actions: scenario.actions.map(action => {
+                  if (action.id === actionId) {
+                    if (newTimeStr === '') {
+                      return { ...action, targetTime: null };
+                    }
+                    const val = parseInt(newTimeStr, 10);
+                    return { ...action, targetTime: isNaN(val) ? null : val };
+                  }
+                  return action;
+                })
+              };
+            }
+            return scenario;
+          })
+        );
+      };
+
+      // メニュー画面でシナリオの配点を変更する処理
+      const handleScenarioPenaltyChange = (actionId, newPenalty) => {
+        setScenarios(prevScenarios => 
+          prevScenarios.map(scenario => {
+            if (scenario.id === activeScenarioId) {
+              return {
+                ...scenario,
+                actions: scenario.actions.map(action => 
+                  action.id === actionId ? { ...action, penalty: Number(newPenalty) } : action
+                )
+              };
+            }
+            return scenario;
+          })
+        );
+      };
+
+      // メニュー画面からプレイ画面(ready状態)へ遷移する初期化
+      const handleStartSimulation = () => {
+        setActions(activeScenario.actions.map(a => ({ 
+          ...a, 
+          penalty: a.penalty !== undefined ? a.penalty : 10,
+          status: 'pending', 
+          executeTime: null, 
+          autoDeducted: false 
+        })));
+        setHp(activeScenario.initialHp);
+        setGameState('ready');
+        setTimeElapsed(0);
+        setLogs([]);
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        setAppMode('play');
+      };
+
+      // プレイ画面内でタイマーを始動させる処理
+      const startGame = () => {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        setGameState('playing');
+        setTimeElapsed(0);
+        setHp(activeScenario.initialHp);
+        setLogs([{ time: 0, message: activeScenario.description, type: 'warning' }]);
+        setActions(prevActions => prevActions.map(a => ({ 
+          ...a, 
+          status: 'pending', 
+          executeTime: null, 
+          autoDeducted: false 
+        })));
+      };
+
+      // 準備段階（ready）で目標時間を変更する処理
+      const handleTargetTimeChange = (id, newTimeStr) => {
+        setActions((prevActions) =>
+          prevActions.map((action) => {
+            if (action.id === id) {
+              if (newTimeStr === '') {
+                return { ...action, targetTime: null };
+              }
+              const val = parseInt(newTimeStr, 10);
+              return { ...action, targetTime: isNaN(val) ? null : val };
+            }
+            return action;
+          })
+        );
+      };
+
+      // 準備段階（ready）で配点を変更する処理
+      const handlePenaltyChange = (id, newPenalty) => {
+        setActions((prevActions) =>
+          prevActions.map((action) =>
+            action.id === id ? { ...action, penalty: Number(newPenalty) } : action
+          )
+        );
+      };
+
+      // メインタイマー
+      useEffect(() => {
+        let timer;
+        if (appMode === 'play' && gameState === 'playing') {
+          timer = setInterval(() => {
+            setTimeElapsed((prevTime) => {
+              const newTime = prevTime + 1;
+              
+              setHp((prevHp) => {
+                const newHp = activeScenario.calculateDamage(newTime, prevHp, actions);
+                return Number(newHp.toFixed(1));
+              });
+              
+              if (newTime >= activeScenario.goalTime && hp > 0) {
+                setGameState('clear');
+                addLog('目標時間を達成しました。活動終了！', 'success');
+              }
+              return newTime;
+            });
+          }, 1000); 
+        }
+        return () => clearInterval(timer);
+      }, [appMode, gameState, actions, activeScenario]);
+
+      // 音声再生
+      useEffect(() => {
+        if (gameState !== 'playing') return;
+        
+        const audioEvent = activeScenario.audioEvents?.find(event => event.time === timeElapsed);
+        
+        if (audioEvent) {
+          if (isAudioEnabled && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); 
+            const utterance = new SpeechSynthesisUtterance(audioEvent.text);
+            utterance.lang = 'ja-JP';
+            utterance.rate = 0.85; 
+            window.speechSynthesis.speak(utterance);
+          }
+          addLog(`【患者の声】「${audioEvent.text}」`, 'info');
+        }
+      }, [timeElapsed, gameState, activeScenario, isAudioEnabled]);
+
+      // 時間超過による自動減点 (-5点)
+      useEffect(() => {
+        if (gameState !== 'playing') return;
+
+        setActions((prevActions) => {
+          let isUpdated = false;
+          const nextActions = prevActions.map((action) => {
+            if (action.targetTime && action.status === 'pending' && !action.autoDeducted && timeElapsed > action.targetTime) {
+              isUpdated = true;
+              setTimeout(() => {
+                addLog(`【時間超過】「${action.name}」の目標時間を過ぎました（自動減点 -5）`, 'error');
+              }, 0);
+              return { ...action, autoDeducted: true };
+            }
+            return action;
+          });
+          return isUpdated ? nextActions : prevActions;
+        });
+      }, [timeElapsed, gameState]);
+
+      // 終了時の未実施項目ログ出力
+      const prevGameStateRef = useRef(gameState);
+      useEffect(() => {
+        if (prevGameStateRef.current === 'playing' && (gameState === 'clear' || gameState === 'gameover')) {
+           const unexecuted = actions.filter(a => a.status === 'pending');
+           if(unexecuted.length > 0) {
+             setTimeout(() => {
+               addLog(`【最終評価】活動終了時の未実施項目（保留分）を合算しました。`, 'warning');
+               unexecuted.forEach(action => {
+                 addLog(`【未実施】「${action.name}」（減点 -${action.penalty}）`, 'error');
+               });
+             }, 500);
+           }
+        }
+        prevGameStateRef.current = gameState;
+      }, [gameState, actions]);
+
+      // 評価ボタンを押したときの処理
+      const handleAction = (id, resultStatus) => {
+        if (gameState !== 'playing') return;
+
+        setActions((prevActions) => 
+          prevActions.map((action) => {
+            if (action.id === id && action.status === 'pending') {
+              
+              if (resultStatus === 'success') {
+                const isLate = action.targetTime && timeElapsed > action.targetTime;
+                const status = isLate ? 'warning' : 'info';
+                addLog(`${formatTime(timeElapsed)}: 「${action.name}」を実施しました。`, status);
+                
+                if (id === 'fluid' || id === 'iv') {
+                  setHp(prev => Math.min(100, prev + 10));
+                  addLog('循環動態が少し改善しました (HP+10)', 'info');
+                }
+                if (id === 'thoracotomy') {
+                   addLog('究極の蘇生手技が選択されました。', 'warning');
+                }
+              } else if (resultStatus === 'failed') {
+                addLog(`【減点】「${action.name}」が出来ませんでした（減点 -${action.penalty}）`, 'error');
+              }
+
+              return { ...action, status: resultStatus, executeTime: timeElapsed };
+            }
+            return action;
+          })
+        );
+      };
+
+      const addLog = (message, type = 'default') => {
+        setLogs((prev) => [{ time: timeElapsed, message, type }, ...prev]);
+      };
+
+      const formatTime = (seconds) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      };
+
+      // --- メニュー画面 ---
+      if (appMode === 'menu') {
+        return (
+          <div className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
+            <div className="max-w-5xl mx-auto">
+              <div className="mb-6">
+                <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+                  <Settings className="w-8 h-8 mr-3" /> メディカルラリー シナリオ管理
+                </h1>
+                <p className="text-gray-600 mt-2">評価に使用するシナリオを選択してください。</p>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="w-full md:w-1/3 bg-white rounded-xl shadow p-4">
+                  <h2 className="font-bold text-gray-700 mb-4 border-b pb-2 flex items-center"><List className="w-5 h-5 mr-2"/> 登録シナリオ一覧</h2>
+                  <div className="space-y-3">
+                    {scenarios.map((scenario) => (
+                      <button
+                        key={scenario.id}
+                        onClick={() => handleSelectScenario(scenario)}
+                        className={`w-full text-left p-3 rounded-lg border transition-all ${
+                          activeScenario.id === scenario.id 
+                            ? 'border-blue-500 bg-blue-50 shadow-sm' 
+                            : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="font-bold text-gray-800">{scenario.title}</div>
+                        <div className="text-xs text-gray-500 mt-1">評価項目数: {scenario.actions.length}件</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="w-full md:w-2/3 bg-white rounded-xl shadow flex flex-col overflow-hidden h-[70vh]">
+                  <div className="bg-gray-800 text-white p-4 shrink-0">
+                    <h2 className="text-xl font-bold">{activeScenario.title}</h2>
+                    <p className="text-sm text-gray-300 mt-1">目標活動時間: {formatTime(activeScenario.goalTime)}</p>
+                  </div>
+                  <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+                    <div className="mb-6">
+                      <h3 className="text-sm font-bold text-gray-500 mb-2 flex justify-between items-center">
+                        <span>想定状況 (プロローグ)</span>
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">※自由に書き換え可能</span>
+                      </h3>
+                      <textarea
+                        value={activeScenario.description}
+                        onChange={handleDescriptionChange}
+                        className="w-full bg-white p-3 rounded border border-gray-300 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[80px]"
+                        placeholder="ここに想定状況を入力してください..."
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-500 mb-2">設定されている評価項目と目標時間</h3>
+                      <div className="bg-white rounded border border-gray-200 overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-gray-100 text-gray-600">
+                            <tr>
+                              <th className="px-4 py-2 border-b">処置・手技名</th>
+                              <th className="px-4 py-2 border-b">目標時間 (秒数)</th>
+                              <th className="px-4 py-2 border-b">未実施減点 (配点セット)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activeScenario.actions.map((action, idx) => (
+                              <tr key={idx} className="border-b last:border-0 hover:bg-gray-50">
+                                <td className="px-4 py-2">{action.name}</td>
+                                <td className="px-4 py-2">
+                                  <div className="flex items-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="10"
+                                      value={action.targetTime === null ? '' : action.targetTime}
+                                      onChange={(e) => handleScenarioTargetTimeChange(action.id, e.target.value)}
+                                      placeholder="なし"
+                                      className="bg-white border border-gray-300 rounded text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-16 text-center py-1 mr-1"
+                                    />
+                                    <span className="text-xs text-gray-500 mr-2">秒</span>
+                                    {action.targetTime !== null && action.targetTime >= 0 && (
+                                      <span className="text-xs font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{formatTime(action.targetTime)}</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex items-center">
+                                    <span className="text-red-600 font-bold mr-1">-</span>
+                                    <select
+                                      value={action.penalty !== undefined ? action.penalty : 10}
+                                      onChange={(e) => handleScenarioPenaltyChange(action.id, e.target.value)}
+                                      className="bg-white border border-gray-300 rounded text-sm font-bold text-red-600 focus:outline-none focus:ring-2 focus:ring-blue-500 w-16 text-center py-1 cursor-pointer"
+                                    >
+                                      {[...Array(21).keys()].map(num => (
+                                        <option key={num} value={num}>{num}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-white border-t border-gray-200 shrink-0">
+                    <button 
+                      onClick={handleStartSimulation}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-colors text-lg"
+                    >
+                      このシナリオでラリー評価を開始する
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // --- プレイ画面 ---
+      
+      const totalDeduction = actions.reduce((sum, action) => {
+        let deduction = 0;
+        
+        if (action.status === 'failed') {
+          deduction += action.penalty;
+        } 
+        else if ((gameState === 'clear' || gameState === 'gameover') && action.status === 'pending') {
+          deduction += action.penalty;
+        }
+
+        if (action.autoDeducted && action.status !== 'failed') {
+          deduction += 5;
+        }
+
+        return sum + deduction;
+      }, 0);
+      
+      const currentScore = Math.max(0, 100 - totalDeduction); 
+
+      return (
+        <div className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
+          <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row relative">
+            
+            <button 
+              onClick={() => {
+                if(window.speechSynthesis) window.speechSynthesis.cancel();
+                setAppMode('menu');
+              }}
+              className="absolute top-4 left-4 md:top-6 md:left-6 text-gray-500 hover:text-gray-800 bg-white/80 p-2 rounded-full shadow-sm z-20 flex items-center"
+            >
+              <ArrowLeft className="w-5 h-5 mr-1" /> <span className="text-sm font-bold hidden md:inline">シナリオ選択に戻る</span>
+            </button>
+
+            <div className="w-full md:w-2/3 p-4 md:p-6 md:pt-16 border-r border-gray-200 flex flex-col h-[90vh]">
+              <div className="mb-4 flex justify-between items-center border-b pb-4 shrink-0">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-800 flex items-center">
+                    メディカルラリー 評価ツール
+                    <button
+                      onClick={() => setIsAudioEnabled(!isAudioEnabled)}
+                      className={`ml-4 p-2 rounded-full border ${isAudioEnabled ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-gray-100 border-gray-300 text-gray-400'} hover:bg-opacity-80 transition-colors`}
+                      title={isAudioEnabled ? "音声指示を無効にする" : "音声指示を有効にする"}
+                    >
+                      {isAudioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                    </button>
+                  </h1>
+                  <p className="text-sm text-blue-600 font-bold mt-1">実施シナリオ：{activeScenario.title}</p>
+                </div>
+                <Activity className={`w-8 h-8 ${gameState === 'playing' ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
+              </div>
+
+              <div className="flex space-x-4 mb-4 shrink-0">
+                <div className="flex-1 bg-gray-50 p-2 md:p-3 rounded-lg border border-gray-200 flex flex-col justify-center items-center">
+                  <span className="text-xs text-gray-500 font-medium mb-1">経過時間</span>
+                  <span className={`text-2xl font-mono font-bold ${timeElapsed > (activeScenario.goalTime / 2) ? 'text-red-600' : 'text-gray-800'}`}>
+                    {formatTime(timeElapsed)}
+                  </span>
+                </div>
+
+                <div className="flex-1 bg-blue-50 p-2 md:p-3 rounded-lg flex flex-col justify-center items-center border border-blue-200">
+                  <span className="text-xs text-blue-800 font-bold mb-1">手技評価 総合スコア</span>
+                  <span className={`text-3xl font-bold ${currentScore < 60 ? 'text-red-600' : 'text-blue-700'}`}>
+                    {currentScore} <span className="text-sm text-blue-500">/ 100</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500 mt-1">初期100点からの減点方式</span>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-2 pb-4">
+                <h3 className="font-semibold text-gray-700 mb-2 sticky top-0 bg-white py-1 z-10 border-b">
+                  評価可能な処置・手技 {gameState === 'ready' && <span className="text-blue-600 text-xs ml-2">※目標時間と配点をセットしてください</span>}
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-2">
+                  {actions.map((action) => (
+                    <div key={action.id} className={`flex flex-col p-3 md:p-2 rounded-lg border ${action.status !== 'pending' ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200 shadow-sm hover:border-blue-300'} transition-all`}>
+                      
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-3 sm:mb-2 gap-1.5 sm:gap-1">
+                        <span className={`font-bold sm:font-medium text-base sm:text-sm leading-tight ${action.status !== 'pending' ? 'text-gray-600' : 'text-gray-800'}`}>
+                          {action.name}
+                        </span>
+                        
+                        <div className="shrink-0 self-start flex flex-wrap gap-1 items-center">
+                          {gameState === 'ready' ? (
+                            <div className="flex items-center bg-yellow-50 rounded px-1.5 py-1 border border-yellow-200">
+                              <span className="text-[10px] sm:text-xs text-yellow-800 font-bold mr-1">目標:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="10"
+                                placeholder="なし"
+                                value={action.targetTime === null ? '' : action.targetTime}
+                                onChange={(e) => handleTargetTimeChange(action.id, e.target.value)}
+                                className="border border-gray-300 rounded w-12 sm:w-16 text-center text-[10px] sm:text-xs py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                              <span className="text-[10px] sm:text-xs text-gray-500 ml-1">秒</span>
+                              {action.targetTime !== null && action.targetTime >= 0 && (
+                                <span className="text-[10px] sm:text-xs font-mono text-blue-600 ml-1">({formatTime(action.targetTime)})</span>
+                              )}
+                            </div>
+                          ) : (
+                            action.targetTime !== null && (
+                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold ${action.autoDeducted ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                目標: {formatTime(action.targetTime)} {action.autoDeducted && '(超過 -5)'}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-stretch space-x-2 mt-auto">
+                        
+                        {/* 記録ボタン領域 */}
+                        {action.status === 'success' ? (
+                          <div className="flex-1 bg-green-100 text-green-700 py-2.5 md:py-1 px-2 rounded-md md:rounded text-sm md:text-xs font-bold flex items-center justify-center border border-green-200">
+                            <CheckCircle className="w-4 h-4 md:w-3 md:h-3 mr-1"/>実施済 ({formatTime(action.executeTime)})
+                          </div>
+                        ) : action.status === 'failed' ? (
+                          <div className="flex-1 bg-red-100 text-red-700 py-2.5 md:py-1 px-2 rounded-md md:rounded text-sm md:text-xs font-bold flex items-center justify-center border border-red-200">
+                            <XCircle className="w-4 h-4 md:w-3 md:h-3 mr-1"/>減点済 (-{action.penalty})
+                          </div>
+                        ) : (
+                          <div className="flex-1 flex space-x-2 md:space-x-1">
+                            <button
+                              onClick={() => handleAction(action.id, 'success')}
+                              disabled={gameState !== 'playing'}
+                              className="flex-1 bg-blue-600 text-white rounded-md md:rounded py-2.5 md:py-1 text-sm md:text-xs font-bold hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors flex items-center justify-center shadow-sm"
+                            >
+                              <CheckCircle className="w-4 h-4 md:w-3 md:h-3 mr-1"/>できた
+                            </button>
+                            <button
+                              onClick={() => handleAction(action.id, 'failed')}
+                              disabled={gameState !== 'playing'}
+                              className="flex-1 bg-gray-600 text-white rounded-md md:rounded py-2.5 md:py-1 text-sm md:text-xs font-bold hover:bg-gray-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors flex items-center justify-center shadow-sm"
+                            >
+                              <XCircle className="w-4 h-4 md:w-3 md:h-3 mr-1"/>減点
+                            </button>
+                          </div>
+                        )}
+
+                        {/* 配点設定プルダウン */}
+                        <div className={`flex items-center rounded-md md:rounded p-1 border shrink-0 ${gameState === 'ready' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <span className={`text-xs md:text-[10px] px-1 font-bold md:font-medium md:hidden xl:inline-block ${gameState === 'ready' ? 'text-blue-700' : 'text-gray-500'}`}>配点</span>
+                          <select
+                            value={action.penalty}
+                            onChange={(e) => handlePenaltyChange(action.id, e.target.value)}
+                            disabled={gameState !== 'ready'}
+                            className="bg-white border border-gray-300 rounded text-base md:text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-16 md:w-12 text-center py-1 md:py-0.5 cursor-pointer disabled:bg-transparent disabled:border-transparent disabled:text-gray-500"
+                          >
+                            {[...Array(21).keys()].map(num => (
+                              <option key={num} value={num}>-{num}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-200 shrink-0">
+                {gameState === 'ready' && (
+                    <button onClick={startGame} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md">
+                      ▶ シミュレーション開始 (タイマー始動)
+                    </button>
+                  )}
+                  {(gameState === 'gameover' || gameState === 'clear' || gameState === 'playing') && (
+                    <button onClick={startGame} className={`w-full font-bold py-3 px-4 rounded-lg transition-colors ${gameState === 'playing' ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-gray-800 text-white hover:bg-gray-900'}`}>
+                      {gameState === 'playing' ? 'リセットして最初から' : 'リトライする'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-full md:w-1/3 bg-gray-50 p-4 md:p-6 md:pt-16 flex flex-col h-[90vh]">
+                <h2 className="font-bold text-gray-700 mb-4 flex items-center shrink-0">
+                  活動記録 (活動時間: {gameState === 'clear' ? '活動終了' : '現場'})
+                </h2>
+                
+                {gameState === 'gameover' && (
+                  <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shrink-0">
+                    <p className="font-bold flex items-center"><XCircle className="w-5 h-5 mr-2" />救命に失敗しました</p>
+                    <p className="text-sm mt-1">適切なタイミングでの処置が行われず、不可逆的なダメージが進行しました。</p>
+                  </div>
+                )}
+                
+                {gameState === 'clear' && (
+                  <div className="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shrink-0">
+                    <p className="font-bold flex items-center"><CheckCircle className="w-5 h-5 mr-2" />活動完了！</p>
+                    <p className="text-sm mt-1">適切な時間管理により、傷病者の命を繋ぐことができました。</p>
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                  {logs.length === 0 && gameState === 'ready' ? (
+                    <p className="text-gray-400 text-center mt-10">設定を完了し、シミュレーションを開始してください</p>
+                  ) : (
+                    logs.map((log, index) => (
+                      <div key={index} className={`p-3 rounded-lg text-sm ${
+                        log.type === 'warning' ? 'bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500' :
+                        log.type === 'error' ? 'bg-red-100 text-red-800 border-l-4 border-red-500' :
+                        log.type === 'success' ? 'bg-green-100 text-green-800 border-l-4 border-green-500' :
+                        log.message.includes('【患者の声】') ? 'bg-purple-100 border-l-4 border-purple-500 text-purple-800' :
+                        'bg-white border border-gray-200 text-gray-700'
+                      }`}>
+                        {log.type === 'warning' && <AlertTriangle className="w-4 h-4 inline mr-1 mb-1" />}
+                        {log.message}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
