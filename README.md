@@ -109,7 +109,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 2</div>
-      <div class="lesson-desc">多言語 災害時誘導アナウンスツール</div>
+      <div class="lesson-desc">メディカルラリー評価ツール</div>
       <a href="lesson2/index.html" class="button">▶ 学習する</a>
     </div>
 
