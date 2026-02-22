@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>防災気象情報 e-Learning</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome (Icons) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (JSXをブラウザで変換するため) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Noto Serif JP', serif;
+    }
+  </style>
+</head>
+<body class="bg-stone-50 text-slate-800">
+  
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- データ定義 ---
+    const allQuestions = [
+      { q: "新しい防災気象情報の運用開始時期はいつ予定されていますか？", options: ["令和7年4月", "令和8年5月下旬", "令和9年4月", "令和10年5月下旬"], a: 1, e: "令和8年5月下旬から新しい防災気象情報の運用が開始される予定です。" },
+      { q: "新しい情報体系において、警戒レベル4相当として新設される情報の名称は何ですか？", options: ["特別警報", "緊急警報", "危険警報", "警戒警報"], a: 2, e: "危険な場所から全員避難を促すため、警戒レベル4相当の情報として「危険警報」が新設されます。" },
+      { q: "警戒レベル5に相当する情報の名称はどのように統一されますか？", options: ["危険警報", "特別警報", "発生情報", "災害速報"], a: 1, e: "「レベル5大雨特別警報」や「レベル5氾濫特別警報」のように、レベル5の情報はすべて「特別警報」という名称になります。" },
+      { q: "警戒レベル3に相当する情報の名称はどのように統一されますか？", options: ["注意報", "警戒情報", "危険警報", "警報"], a: 3, e: "警戒レベル3相当の情報はすべて「警報」（例：レベル3大雨警報）という名称に統一されます。" },
+      { q: "警戒レベル4が発表された際、住民がとるべき行動はどれですか？", options: ["危険な場所から全員避難", "高齢者等避難", "直ちに安全確保", "避難の準備"], a: 0, e: "警戒レベル4は「危険な場所から全員避難」が求められるタイミングです。" },
+      { q: "警戒レベル5が発表された際、住民がとるべき行動はどれですか？", options: ["全員避難", "高齢者等避難", "直ちに安全確保", "避難ルートの確認"], a: 2, e: "警戒レベル5はすでに安全な避難ができず命が危険な状況であるため、「直ちに安全確保」が求められます。" },
+      { q: "警戒レベル3が発表された際、早めに避難行動を開始すべき対象者は誰ですか？", options: ["全員", "高齢者や障害のある人など避難に時間を要する人", "避難所運営に関わる人のみ", "沿岸部の住民のみ"], a: 1, e: "警戒レベル3は「高齢者等避難」の段階であり、避難に時間を要する人は危険な場所から早めに避難し、その他の人は避難の準備等を行います。" },
+      { q: "現在、警戒レベル4にあたる「避難勧告」と「避難指示」はどのように扱われていますか？", options: ["両方とも継続して発令される", "避難勧告に一本化されている", "避難指示に一本化されている", "緊急安全確保に統合されている"], a: 2, e: "令和3年の法改正により避難勧告は廃止され、「避難指示」に一本化されています。" },
+      { q: "以下の防災気象情報のうち、警戒レベル相当情報に位置づけられないものはどれですか？", options: ["高潮警報", "暴風警報", "大雨注意報", "土砂災害危険警報"], a: 1, e: "暴風、波浪、大雪などの特別警報・警報・注意報は、警戒レベル相当情報ではありません。" },
+      { q: "現在気象台が発表している「市町村ごとの洪水警報・洪水注意報」は今後どうなりますか？", options: ["発表頻度を増やす", "運用が廃止される", "都道府県が発表するようになる", "名称のみ変更される"], a: 1, e: "洪水予報河川ごとの発表へ移行するため、これまでの気象台による市町村ごとの洪水警報・注意報の発表は行われず廃止されます。" },
+      { q: "洪水予報河川（大河川）の氾濫に関する情報は、今後どのような単位で発表されますか？", options: ["市町村ごと", "都道府県ごと", "河川ごと", "地区ごと"], a: 2, e: "洪水予報河川に関する情報は河川ごとの発表となり、これを一般向けの警報扱いとします。" },
+      { q: "洪水予報河川以外の河川（中小河川など）の外水氾濫は、どの情報の中でまとめて扱われますか？", options: ["高潮に関する情報", "土砂災害に関する情報", "大雨に関する情報", "竜巻注意情報"], a: 2, e: "中小河川の氾濫についても、「レベル4大雨危険警報」などの大雨に関する情報の中で扱われます。" },
+      { q: "下水道などの排水能力が追いつかずに発生する「内水氾濫」は、どの情報の中で扱われますか？", options: ["高潮に関する情報", "大雨に関する情報", "土砂災害に関する情報", "氾濫注意情報"], a: 1, e: "湛水型や氾濫型の内水氾濫についても、大雨に関する情報の中で発表されます。" },
+      { q: "中小河川の氾濫等も対象とするため、大雨情報の発表基準として新たに追加される指標は何ですか？", options: ["土壌雨量指数", "60分雨量", "流域雨量指数", "潮位指数"], a: 2, e: "外水氾濫も対象にするため、発表基準に「流域雨量指数」が追加されます。" },
+      { q: "「表面雨量指数」とは何を把握するための指標ですか？", options: ["河川を流れ下る水量", "短時間強雨による浸水危険度", "土砂崩れの危険度", "波の打上げ高"], a: 1, e: "降った雨が地表面にどれだけ溜まっているかを示し、低い土地の浸水被害など短時間強雨による浸水危険度を把握するための指標です。" },
+      { q: "「流域雨量指数」とは何を把握するための指標ですか？", options: ["地表面の浸水状況", "海面の上昇", "下流の対象地点の洪水危険度", "土砂の水分量"], a: 2, e: "河川の上流域に降った雨により、どれだけ下流の対象地点の洪水危険度が高まるかを把握するための指標です。" },
+      { q: "新しい大雨に関する情報で、警戒レベル5に相当する名称は何ですか？", options: ["大雨特別警報（浸水害）", "レベル5大雨特別警報", "レベル5大雨危険警報", "氾濫発生情報"], a: 1, e: "警戒レベルに合わせて整理され、名称は「レベル5大雨特別警報」となります。" },
+      { q: "現在の「土砂災害警戒情報」は、新しい体系でどの名称に変更されますか？", options: ["レベル4土砂災害危険警報", "レベル5土砂災害特別警報", "レベル3土砂災害警報", "土砂災害注意報"], a: 0, e: "警戒レベル4相当情報として「レベル4土砂災害危険警報」に名称が変更されます。" },
+      { q: "新しい土砂災害情報の発表基準として用いられる指標は何ですか？", options: ["表面雨量指数と流域雨量指数", "潮位と気圧", "土壌雨量指数と60分雨量", "3時間雨量と風速"], a: 2, e: "これまでと同様に、土壌雨量指数（解析・予測）と60分雨量（解析・予測）の2要素が発表指標として用いられます。" },
+      { q: "現行の「大雨警報（土砂災害）」の最も大きな課題は何とされていますか？", options: ["発表が遅すぎる", "発表されても土砂災害警戒情報の基準に到達しない事例（空振り）が多い", "住民に情報が届かない", "発表基準が厳しすぎる"], a: 1, e: "警戒レベル3相当の発表回数が特に多く、土砂災害警戒情報基準に到達しない空振りが多いことが課題とされていました。" },
+      { q: "新しい「レベル3土砂災害警報」は、何時間先にレベル4基準に到達すると予想される場合に発表されますか？", options: ["1時間先", "3時間先", "12時間先", "24時間先"], a: 1, e: "3時間先（予測可能な場合は4〜6時間先）にレベル4基準に到達すると予想される場合に限定して発表されるようになります。" },
+      { q: "発表基準の見直しにより、新しい「レベル3土砂災害警報」の発表回数はどう変化すると見込まれますか？", options: ["大幅に増加する", "少し増加する", "変わらない", "大幅に減少する"], a: 3, e: "警戒レベル4相当に至らない空振りの発表が抑制されるため、発表回数は大幅に減ります。" },
+      { q: "土砂災害のキキクル（危険度分布）において、運用変更後に留意すべき特性はどれですか？", options: ["常に赤色が表示されるようになる", "注意（黄色）から危険（紫色）へ直接変わるケースが多くなる", "色の表示がすべて廃止される", "赤色の出現頻度が極端に増える"], a: 1, e: "警戒（赤色）の判定が狭くなるため、赤色が出現せず黄色から一気に紫色へ変わるケースが多くなります。" },
+      { q: "新設される「レベル5土砂災害特別警報」はどのような状況で発表されますか？", options: ["強い雨が降り始めたとき", "土壌雨量指数が注意基準を超えたとき", "基準に到達し、さらに激しい雨が降り続くと予想される場合", "避難が完了したとき"], a: 2, e: "土砂災害がすでに発生していてもおかしくない状況で基準に到達し、さらに激しい雨が降り続くと予想される場合に発表されます。" },
+      { q: "高潮情報の精度向上のために、気圧低下や風による影響に加えて新たに加味される要素は何ですか？", options: ["降水量", "波の打上げ高", "海水温", "地震の揺れ"], a: 1, e: "これまでの吸い上げ・吹き寄せ効果に加え、新たに予測可能になった「波の打上げ高」が加味されます。" },
+      { q: "なぜ高潮情報に「波の打上げ高」を新たに加味するのですか？", options: ["津波と明確に区別するため", "近年の予測モデルや観測技術の開発により予測可能になったため", "風速計が廃止されたため", "気圧の測定ができなくなったため"], a: 1, e: "実際の被害要因である波の打上げ高予測モデルや観測技術が開発され、その予測や観測が可能になったためです。" },
+      { q: "波の打上げ高を加味した精度の高い高潮予報・警報は、どこが共同で実施しますか？", options: ["消防庁と警察庁", "市町村と消防団", "国土交通省・気象台・都道府県", "気象庁のみ"], a: 2, e: "指定された高潮予報海岸において、国土交通省・気象台・都道府県の三者で共同して予報・警報が実施されます。" },
+      { q: "「レベル5高潮特別警報」が発表されるのはどのような状況ですか？", options: ["台風が発生した直後", "高潮注意報が出たとき", "浸水被害のおそれがある状況の数時間前", "高潮による氾濫が発生または切迫している場合"], a: 3, e: "高潮による氾濫が発生している、または切迫している場合にレベル5の情報として発表されます。" },
+      { q: "大雨や土砂災害の危険度が高まっている地域を地図上で確認できる「キキクル」の正式名称は何ですか？", options: ["危険度分布", "早期注意情報", "時系列情報", "気象解説情報"], a: 0, e: "キキクルは、危険度が高まっている地域を地図上で確認するための「危険度分布」のことです。" },
+      { q: "「早期注意情報（警報級の可能性）」は、何日先までの現象の可能性を発表するものですか？", options: ["翌日まで", "3日先まで", "5日先まで", "1週間先まで"], a: 2, e: "災害への心構えを高めるため、5日先までの警報級の現象の可能性を発表します。" },
+      { q: "「時系列情報」とはどのような情報ですか？", options: ["過去の災害履歴をまとめたもの", "明日までの気象状況の見通しを毎日4回発表するもの", "1時間ごとの雨量実測値を記録したもの", "避難完了時間をカウントダウンするもの"], a: 1, e: "警報や注意報に先立って、翌日までの気象状況の見通し（危険度等）を毎日4回発表する情報です。" },
+      { q: "線状降水帯などの顕著現象が発生、または発生しつつある場合に、極端な現象を速報的に伝える情報はどれですか？", options: ["気象解説情報", "早期注意情報", "気象防災速報", "特別警報"], a: 2, e: "極端な現象を速報的に伝える情報として「気象防災速報」が発表されます。" },
+      { q: "現在の「記録的短時間大雨情報」は、新しい名称では何に変更されますか？", options: ["気象解説情報（大雨）", "気象防災速報（記録的短時間大雨）", "レベル5大雨特別警報", "大雨キキクル"], a: 1, e: "記録的短時間大雨情報は「気象防災速報（記録的短時間大雨）」という名称へ変更されます。" },
+      { q: "新しい通報制度において、氾濫による著しい危険が切迫した際にプッシュ型で「通報」を行うのは誰ですか？", options: ["住民", "消防団長", "気象台", "河川管理者等（河川・下水道・海岸管理者）"], a: 3, e: "危険が切迫した際、河川管理者等が水防事務を担う都道府県知事等へ直接通報を行います。" },
+      { q: "この「新たな通報制度」は、警戒レベルのどの段階に相当する状況で行われますか？", options: ["警戒レベル2相当", "警戒レベル3相当", "警戒レベル4相当", "警戒レベル5相当（著しい危険が切迫した状態）"], a: 3, e: "氾濫によって住民の生命に影響が及ぶ蓋然性が高くなる状況、すなわち警戒レベル5相当の状態で行われます。" },
+      { q: "河川管理者等から通報を受けた都道府県知事は、誰に対して「通知」を行いますか？", options: ["近隣の県知事", "自衛隊", "市町村長などの水防関係者および気象庁長官", "消防庁長官"], a: 2, e: "水防関係者である市町村長等へ通知するとともに、気象庁長官にも通知を行います。" },
+      { q: "気象庁長官へ通知された氾濫通報は、どのように活用されますか？", options: ["職員の非常参集に使う", "特別警報発表の判断要素として活用される", "天気予報の修正に使う", "キキクルの色を変えるためにのみ使う"], a: 1, e: "気象庁長官への通知は、気象庁が発表する特別警報の判断要素として活用されます。" },
+      { q: "市町村長への氾濫通知は、どのような防災対応に繋げることが目的ですか？", options: ["予算の確保", "迅速な緊急安全確保の指示や的確な水防活動", "ハザードマップの改訂", "記者会見の準備"], a: 1, e: "市町村長等による迅速な避難指示（緊急安全確保措置）や、その他の的確な水防活動に繋げることが目的です。" },
+      { q: "この制度で想定される「水防活動」の具体的な内容として挙げられているものはどれですか？", options: ["避難所の物資調達", "巡視活動、水防工法や避難誘導・救助活動", "道路の舗装", "堤防の設計"], a: 1, e: "水災を警戒・防御し被害を軽減するための活動として、巡視活動、水防工法や避難誘導・救助活動が含まれます。" },
+      { q: "新しい情報体系において、直感的な理解を促すため、警戒レベルの数字は情報名称のどこに付与されますか？", options: ["名称の最後に付く（大雨警報レベル3）", "名称の先頭に付く（レベル3大雨警報）", "別々に発表される", "括弧書きで名称の途中に付く"], a: 1, e: "「レベル4大雨危険警報」のように、情報名称の先頭にレベルの数字を付けて発表されます。" },
+      { q: "警戒レベル1の「早期注意情報」が発表された際、住民に求められる行動の目安はどれですか？", options: ["自らの避難行動を確認する", "災害への心構えを高める", "高齢者等は避難する", "全員避難する"], a: 1, e: "今後気象状況が悪化するおそれがあるため「災害への心構えを高める」段階です。" },
+      { q: "警戒レベル2の情報が発表された際、住民に求められる行動の目安はどれですか？", options: ["心構えを高める", "自らの避難行動（避難場所や避難ルート等）を確認する", "危険な場所から避難する", "直ちに安全確保"], a: 1, e: "気象状況が悪化しているため、ハザードマップや避難場所など自らの避難行動を確認する段階です。" },
+      { q: "大雨情報の指標となる「表面雨量指数」や「流域雨量指数」は、どのような値を用いて情報発表に利用されますか？", options: ["実測値のみ", "解析値と予測値（解析・予測）", "過去の平均値", "衛星画像のみ"], a: 1, e: "現状の解析値と今後の予測値（解析・予測）が発表指標として用いられます。" },
+      { q: "現在の「水位周知河川」に関する情報の運用について、当面の間どのような方針がとられますか？", options: ["直ちにすべての運用を停止する", "警戒レベルとの関係を含めこれまで通りの運用とし、洪水予報河川への移行を促進する", "すべて市町村に権限を移譲する", "大雨警報に完全統合する"], a: 1, e: "水位周知河川はこれまで通りの運用としつつ、洪水予報河川への移行を促進するとされています。" },
+      { q: "新しい土砂災害情報において、警戒レベル4に至らないレベル3土砂災害警報の発表回数は、令和3年データとの比較で約何分の一に減少すると算出されていますか？", options: ["変わらない", "約2分の1以下", "約5分の1", "約10分の1"], a: 1, e: "令和3年データに基づく試算では、現行の計4660回から新方式の計1911回へ減少し、半分以下に大幅削減されます。" },
+      { q: "レベル3土砂災害警報の発表が厳格化されることに伴い、消防や住民が留意すべき運用上の変化はどれですか？", options: ["情報が出たら必ず被害が起きるようになる", "キキクルを見る必要がなくなる", "レベル3土砂災害警報からレベル4危険警報までの時間が短くなる事例が増える", "土壌雨量指数が公開されなくなる"], a: 2, e: "基準の厳格化により、レベル3からレベル4までの時間が短くなる、あるいはレベル3を経ずにいきなりレベル4が出る事例が増加します。" },
+      { q: "新しい「大雨キキクル」では、現在のどの情報を統合・重ねて表示するようになりますか？", options: ["土砂と洪水", "洪水キキクル（大河川以外の河川の氾濫）と浸水キキクル", "高潮と浸水", "土砂と高潮"], a: 1, e: "現在分かれている大河川以外の河川の氾濫危険度（洪水）と浸水危険度を重ねて表示するようになります。" },
+      { q: "「気象解説情報」とは、どのような内容をどの単位で発表する情報ですか？", options: ["現在・今後の気象状況を網羅的に解説し、全国・地方・府県単位で発表する", "過去の気象データのみを市町村単位で発表する", "避難所の開設状況を番地単位で発表する", "河川の水位のみを河川単位で発表する"], a: 0, e: "現在や今後の気象状況や災害危険度の見通しを網羅的に解説する情報として、全国・地方・府県単位で適宜発表されます。" },
+      { q: "気象庁ホームページ等において、警戒レベル相当情報ではない「特別警報（暴風や大雪など）」はどのような配色で表示されますか？", options: ["赤", "紫", "黒", "黄"], a: 2, e: "警戒レベルに関わらず、特別警報は黒、警報は赤を用いて表示されるため、警戒レベルに相当しない点に留意が必要です。" },
+      { q: "消防・防災対応において、実際の「避難の判断や後押し」にはどの情報を活用することが推奨されていますか？", options: ["早期注意情報", "キキクル（危険度分布）や気象防災速報", "時系列情報", "過去の新聞記事"], a: 1, e: "早期注意情報や時系列情報で事前の体制確保を検討し、実際の避難判断等にはリアルタイムの危険を示すキキクルや気象防災速報を活用することが推奨されています。" }
+    ];
+
+    const faqData = [
+      {
+        category: "1. 全般的な変更点と警戒レベル",
+        items: [
+          { q: "新しい防災気象情報の運用はいつから始まりますか？", a: "令和8年5月下旬から運用開始予定です。" },
+          { q: "なぜ防災気象情報が見直されるのですか？", a: "現在のシステムは警戒レベルと防災気象情報（特別警報・警報・注意報など）との関係が分かりづらいという課題があるためです。住民が直感的に避難行動をとれるよう、5段階の警戒レベルに合わせて情報が整理されます。" },
+          { q: "情報の名称はどのように変わりますか？", a: "「レベル4大雨危険警報」のように、情報名称そのものに警戒レベルの数字が付いて発表されるようになります。" },
+          { q: "新設される「危険警報」とは何ですか？", a: "「危険な場所から全員避難」を促すための、警戒レベル4相当の新しい情報です。" },
+          { q: "レベル2とレベル3の名称はどのように統一されますか？", a: "すべての対象災害において、レベル2は「注意報」、レベル3は「警報」という統一感を持った名称に変更されます。" },
+          { q: "これですべての警報が警戒レベルに紐づくことになりますか？", a: "いいえ、暴風、波浪、大雪、暴風雪などの特別警報・警報・注意報は、警戒レベル相当情報ではありません。" },
+          { q: "警戒レベル5に相当する情報の名称はどうなりますか？", a: "「レベル5大雨特別警報」や「レベル5氾濫特別警報」のように、レベル5の情報はすべて「特別警報」という名称になります。" },
+          { q: "早期注意情報とはどのレベルに該当しますか？", a: "災害への心構えを高めるための、警戒レベル1に該当します。" },
+          { q: "警戒レベル3が発表された場合、誰が避難するべきですか？", a: "高齢者など避難に時間を要する人は早めに避難し、その他の人は避難の準備や自主的な避難の判断を行うタイミングです。" },
+          { q: "警戒レベル5の情報が出てから避難を開始しても間に合いますか？", a: "警戒レベル5の段階ではすでに命が危険な状況であるため、緊急安全確保の発令を待ってはいけません。警戒レベル4（全員避難）の段階までに必ず避難を完了させておく必要があります。" }
+        ]
+      },
+      {
+        category: "2. 河川氾濫・大雨",
+        items: [
+          { q: "現在気象台が発表している「市町村ごとの洪水警報・洪水注意報」はどうなりますか？", a: "今後は発表が行われず、運用が廃止されます。" },
+          { q: "洪水予報河川（大河川）の情報はどう発表されますか？", a: "洪水予報河川に関する情報は河川ごとの発表へ移行し、これが一般向けの警報として扱われます。" },
+          { q: "洪水予報河川以外の河川（中小河川など）の氾濫はどう通知されますか？", a: "中小河川の外水氾濫については、大雨に関する情報（レベル4大雨危険警報など）の中でまとめて扱われるようになります。" },
+          { q: "下水道などの排水が追いつかない内水氾濫に関する情報はどれですか？", a: "内水氾濫に関する情報も、外水氾濫と同様に大雨に関する情報の中で発表されます。" },
+          { q: "大雨情報の発表基準に新しい指標は追加されますか？", a: "はい、これまでの「表面雨量指数」に加えて、新たに「流域雨量指数」も発表基準に加えられます。" },
+          { q: "表面雨量指数とは何ですか？", a: "降った雨が地表面にどれだけ溜まっているかを指数化したものであり、短時間強雨による浸水危険度の高まりを把握するための指標です。" },
+          { q: "流域雨量指数とは何ですか？", a: "河川の上流域に降った雨により、どれだけ下流の対象地点の洪水危険度が高まるかを把握するための指標です。" },
+          { q: "警戒レベル5の「大雨特別警報（浸水害）」の名称はどう変わりますか？", a: "警戒レベルに合わせて「レベル5大雨特別警報」に変更されます。" },
+          { q: "現在の「大雨警報（浸水害）」はどうなりますか？", a: "警戒レベル3相当情報として整理され、「レベル3大雨警報」となります。" },
+          { q: "水位周知河川に関する情報の運用はどうなりますか？", a: "警戒レベルとの関係を含めてこれまで通りの運用としつつ、将来的には洪水予報河川への移行が促進されます。" }
+        ]
+      },
+      {
+        category: "3. 土砂災害",
+        items: [
+          { q: "現在の「土砂災害警戒情報」の名称はどう変わりますか？", a: "警戒レベル4相当の「レベル4土砂災害危険警報」に変更されます。" },
+          { q: "新しい土砂災害情報の発表指標は何ですか？", a: "これまでと同様に、土壌雨量指数（解析・予測）と60分雨量（解析・予測）が用いられます。" },
+          { q: "なぜ「大雨警報（土砂災害）」の発表手法が見直されるのですか？", a: "現在は警戒レベル3相当の発表回数が非常に多く、結果的に警戒レベル4の基準に到達しない事例（空振り）が多いという課題があったためです。" },
+          { q: "新しい「レベル3土砂災害警報」はどのような基準で発表されますか？", a: "3時間先（予測可能な場合は4〜6時間先）にレベル4基準に到達すると予想される場合に限定して発表されるようになります。" },
+          { q: "発表基準の変更により、レベル3土砂災害警報の発表回数はどうなりますか？", a: "空振りが減るため、現行の大雨警報（土砂災害）に比べて発表回数が大幅に減少します。" },
+          { q: "レベル3の発表回数が減ることで注意すべき点はありますか？", a: "レベル3の発表からレベル4までの時間が短くなる事例や、レベル3を経ずにいきなりレベル4が発表される事例が増加する見込みです。" },
+          { q: "「レベル4土砂災害危険警報」の発表基準は変わりますか？", a: "いいえ、従来と同様の考え方（土壌雨量指数と60分雨量の2要素）で設定されます。" },
+          { q: "土砂災害の警戒レベル5の名称は何ですか？", a: "最も危険な状況を示す「レベル5土砂災害特別警報」となります。" },
+          { q: "レベル5土砂災害特別警報はどのような状況で発表されますか？", a: "土砂災害がすでに発生していてもおかしくない、発生確度がより高い状況を示す基準に到達し、さらに激しい雨が降り続くと予想される場合に発表されます。" },
+          { q: "土砂災害に関する早期注意情報はどうなりますか？", a: "これまで通り、災害への心構えを高める警戒レベル1の情報として発表されます。" }
+        ]
+      },
+      {
+        category: "4. 高潮",
+        items: [
+          { q: "高潮に関する新しい情報の予測要素は何ですか？", a: "気圧低下や風による潮位上昇に加え、新たに「波の打上げ高」が加味されます。" },
+          { q: "なぜ「波の打上げ高」を加味するのですか？", a: "実際の高潮被害は海水面の上昇に加えて波の打上げによっても発生し、近年のモデルや観測技術の開発でその予測が可能になったためです。" },
+          { q: "新しい高潮予報・警報は誰が共同で発表しますか？", a: "国土交通省、気象台、都道府県が共同で実施します。" },
+          { q: "波の打上げ高を加味した高潮情報はどこで発表されますか？", a: "国土交通大臣が指定する高潮予報海岸において実施されます。" },
+          { q: "「レベル5高潮特別警報」はどのような状況で発表されますか？", a: "高潮による氾濫が発生している、または切迫している場合に発表されます。" },
+          { q: "レベル4以下の高潮警報等はどのタイミングで発表されますか？", a: "浸水被害のおそれがある状況からリードタイム（猶予時間）をとって発表されます。" }
+        ]
+      },
+      {
+        category: "5. 情報の活用（キキクル・時系列情報など）",
+        items: [
+          { q: "キキクルとは何ですか？", a: "大雨や土砂災害などの危険度が高まっている地域を、地図上で確認できる危険度分布システムのことです。" },
+          { q: "新しい「大雨キキクル」では何が表示されますか？", a: "大河川以外の河川の氾濫危険度と、浸水危険度を重ねて表示します。" },
+          { q: "土砂キキクルの警戒（赤色）の表示はどう変わりますか？", a: "現行に比べて警戒（赤色）の判定が狭くなり、注意（黄色）から危険（紫色）へ直接変わるケースが多くなります。" },
+          { q: "時系列情報とはどのような情報ですか？", a: "警報・注意報に先立って、翌日までの気象状況の見通しを毎日4回発表する情報です。" },
+          { q: "早期注意情報とは何ですか？", a: "5日先までの警報級の現象の可能性を発表し、事前の体制確保を検討するための情報です。" },
+          { q: "時系列情報はどのように表示されますか？", a: "大雨や土砂災害などの危険度が、3時間ごとの時間帯別に「危険」「警戒」「注意」の基準を超える予想として色分けされて示されます。" },
+          { q: "気象防災速報とは何ですか？", a: "線状降水帯などの顕著現象が発生、または発生しつつある場合に、極端な現象を速報的に伝える情報です。" },
+          { q: "「記録的短時間大雨情報」の名称はどう変わりますか？", a: "今後は「気象防災速報（記録的短時間大雨）」として発表されるようになります。" },
+          { q: "気象解説情報とはどのような情報ですか？", a: "現在や今後の気象状況、および災害発生の危険度の見通しなどを網羅的に解説する情報です。" }
+        ]
+      },
+      {
+        category: "6. 新たな通報制度",
+        items: [
+          { q: "河川管理者等による氾濫に係る通報制度とは何ですか？", a: "氾濫による著しい危険が切迫した状態（警戒レベル5相当）にあることを、河川等の管理者が都道府県知事等にプッシュ型で通報する新たな制度です。" },
+          { q: "この通報はどのような目的で行われますか？", a: "状況を速やかに把握し、市町村長による迅速な緊急安全確保の指示や的確な水防活動につなげるためです。" },
+          { q: "誰が通報を行うのですか？", a: "河川管理者、下水道管理者、海岸管理者が通報を行います。" },
+          { q: "通報を受けた都道府県知事は次にどうしますか？", a: "市町村長などの水防関係者に通知するとともに、気象庁長官にも通知を行います。" },
+          { q: "気象庁長官への通知はどのように活用されますか？", a: "気象庁が発表する特別警報の判断要素として活用されます。" }
+        ]
+      }
+    ];
+
+    // --- メインコンポーネント ---
+    function App() {
+      const [currentView, setCurrentView] = useState('learn');
+      const [expandedCategory, setExpandedCategory] = useState(0);
+      const [questions, setQuestions] = useState([]);
+      const [answers, setAnswers] = useState({});
+      const [isSubmitted, setIsSubmitted] = useState(false);
+      const [score, setScore] = useState(0);
+      const [error, setError] = useState("");
+
+      const startQuiz = () => {
+        const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
+        setQuestions(shuffled.slice(0, 5));
+        setAnswers({});
+        setIsSubmitted(false);
+        setScore(0);
+        setError("");
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      useEffect(() => {
+        startQuiz();
+      }, []);
+
+      const handleSelect = (qIndex, oIndex) => {
+        if (isSubmitted) return;
+        setAnswers({ ...answers, [qIndex]: oIndex });
+        setError("");
+      };
+
+      const handleSubmit = () => {
+        if (Object.keys(answers).length < questions.length) {
+          setError("すべての質問に回答してください。");
+          return;
+        }
+        
+        let newScore = 0;
+        questions.forEach((q, index) => {
+          if (answers[index] === q.a) {
+            newScore++;
+          }
+        });
+        setScore(newScore);
+        setIsSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      const startQuizFromLearn = () => {
+        startQuiz();
+        setCurrentView('quiz');
+      };
+
+      return (
+        <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8">
+          
+          {/* Header */}
+          <div className="max-w-3xl mx-auto bg-slate-900 rounded-t-2xl p-8 text-center text-white shadow-xl border-b-[6px] border-amber-600">
+            <div className="flex justify-center items-center mb-4">
+              <i className="fa-solid fa-book-open text-amber-500 mr-4 text-4xl"></i>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-wider">防災気象情報</h1>
+            </div>
+            <p className="text-slate-300 tracking-widest text-sm sm:text-base">E-LEARNING SYSTEM</p>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="max-w-3xl mx-auto bg-slate-800 flex border-b border-slate-700">
+            <button
+              onClick={() => setCurrentView('learn')}
+              className={`flex-1 py-4 flex items-center justify-center font-bold text-sm sm:text-base transition-colors ${currentView === 'learn' ? 'bg-white text-slate-900' : 'text-slate-300 hover:bg-slate-700'}`}
+            >
+              <i className="fa-solid fa-file-lines mr-2 text-xl"></i>
+              FQAで学ぶ
+            </button>
+            <button
+              onClick={() => setCurrentView('quiz')}
+              className={`flex-1 py-4 flex items-center justify-center font-bold text-sm sm:text-base transition-colors ${currentView === 'quiz' ? 'bg-white text-slate-900' : 'text-slate-300 hover:bg-slate-700'}`}
+            >
+              <i className="fa-solid fa-graduation-cap mr-2 text-xl"></i>
+              確認テスト
+            </button>
+          </div>
+
+          {/* Main Content */}
+          <div className="max-w-3xl mx-auto bg-white rounded-b-2xl shadow-xl p-6 sm:p-10">
+
+            {/* Learning View */}
+            {currentView === 'learn' && (
+              <div className="space-y-6">
+                <div className="mb-8 text-center">
+                  <h2 className="text-2xl font-bold text-slate-800 mb-2">よくある質問 (FAQ)</h2>
+                  <p className="text-slate-600">まずは変更点について学びましょう。学習が終わったら確認テストに挑戦してください。</p>
+                </div>
+                
+                <div className="space-y-4">
+                  {faqData.map((category, catIndex) => {
+                    const isExpanded = expandedCategory === catIndex;
+                    return (
+                      <div key={catIndex} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <button
+                          onClick={() => setExpandedCategory(isExpanded ? null : catIndex)}
+                          className="w-full bg-slate-50 p-4 sm:p-5 flex justify-between items-center text-left hover:bg-slate-100 transition-colors"
+                        >
+                          <span className="font-bold text-slate-800 text-lg">{category.category}</span>
+                          {isExpanded ? 
+                            <i className="fa-solid fa-chevron-up text-slate-500 flex-shrink-0 ml-2 text-xl"></i> : 
+                            <i className="fa-solid fa-chevron-down text-slate-500 flex-shrink-0 ml-2 text-xl"></i>
+                          }
+                        </button>
+                        
+                        {isExpanded && (
+                          <div className="p-5 bg-white space-y-6">
+                            {category.items.map((item, itemIndex) => (
+                              <div key={itemIndex} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
+                                <div className="flex items-start mb-2">
+                                  <span className="text-amber-600 font-bold mr-2 mt-0.5">Q.</span>
+                                  <p className="font-bold text-slate-800">{item.q}</p>
+                                </div>
+                                <div className="flex items-start ml-2 sm:ml-6 bg-slate-50 p-3 rounded-lg">
+                                  <span className="text-slate-500 font-bold mr-2 mt-0.5">A.</span>
+                                  <p className="text-slate-600 text-sm sm:text-base leading-relaxed">{item.a}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-12 text-center pt-8 border-t border-slate-200">
+                  <button
+                    onClick={startQuizFromLearn}
+                    className="w-full sm:w-auto mx-auto flex items-center justify-center bg-gradient-to-r from-amber-600 to-amber-700 text-white px-10 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                  >
+                    <i className="fa-solid fa-graduation-cap mr-3 text-2xl"></i>
+                    確認テストに挑戦する
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Quiz View */}
+            <div className={currentView === 'quiz' ? 'block' : 'hidden'}>
+            
+              {isSubmitted && (
+                <div className="mb-10 text-center p-8 bg-gradient-to-br from-slate-50 to-stone-100 rounded-xl border border-slate-200 shadow-sm">
+                  <i className={`fa-solid fa-trophy block mx-auto mb-4 text-6xl ${score >= 4 ? 'text-amber-500' : 'text-slate-400'}`}></i>
+                  <h2 className="text-2xl font-bold text-slate-800 mb-2">採点結果</h2>
+                  <div className="text-5xl font-bold text-slate-900 mb-4">
+                    {score} <span className="text-2xl text-slate-500">/ 5</span>
+                  </div>
+                  <p className="text-slate-600 font-medium">
+                    {score === 5 ? "全問正解！素晴らしい知識です。" : 
+                     score >= 3 ? "よくできました！さらに見識を深めましょう。" : 
+                     "解説を読んで、もう一度挑戦してみましょう！"}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-12">
+                {questions.map((q, qIndex) => {
+                  const isCorrectAnswer = isSubmitted && answers[qIndex] === q.a;
+
+                  return (
+                    <div key={qIndex} className="relative">
+                      <div className="flex items-start mb-4">
+                        <div className="flex-shrink-0 bg-amber-600 text-white font-bold w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-md mr-4 mt-1">
+                          Q{qIndex + 1}
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 leading-relaxed pt-1">
+                          {q.q}
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 ml-14">
+                        {q.options.map((opt, oIndex) => {
+                          const isSelected = answers[qIndex] === oIndex;
+                          const isCorrectOption = oIndex === q.a;
+                          
+                          let buttonStyle = "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-amber-400";
+                          
+                          if (isSubmitted) {
+                            if (isCorrectOption) {
+                              buttonStyle = "bg-green-50 border-green-500 text-green-900 font-bold ring-1 ring-green-500";
+                            } else if (isSelected && !isCorrectOption) {
+                              buttonStyle = "bg-red-50 border-red-400 text-red-800";
+                            } else {
+                              buttonStyle = "bg-slate-50 border-slate-200 text-slate-400 opacity-60";
+                            }
+                          } else if (isSelected) {
+                            buttonStyle = "bg-slate-800 border-slate-800 text-white shadow-md transform scale-[1.01]";
+                          }
+
+                          return (
+                            <button
+                              key={oIndex}
+                              onClick={() => handleSelect(qIndex, oIndex)}
+                              disabled={isSubmitted}
+                              className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-center ${buttonStyle}`}
+                            >
+                              <span className="flex-grow">{opt}</span>
+                              {isSubmitted && isCorrectOption && <i className="fa-solid fa-circle-check text-green-600 ml-2 flex-shrink-0 text-xl"></i>}
+                              {isSubmitted && isSelected && !isCorrectOption && <i className="fa-solid fa-circle-xmark text-red-500 ml-2 flex-shrink-0 text-xl"></i>}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {isSubmitted && (
+                        <div className={`mt-6 ml-14 p-5 rounded-xl border-l-4 ${isCorrectAnswer ? 'bg-green-50/50 border-green-500' : 'bg-red-50/50 border-red-400'}`}>
+                          <div className="flex items-center mb-2">
+                            <span className={`font-bold mr-2 ${isCorrectAnswer ? 'text-green-700' : 'text-red-700'}`}>
+                              {isCorrectAnswer ? "正解！" : "不正解..."}
+                            </span>
+                            <span className="text-slate-500 text-sm">正解は「{q.options[q.a]}」</span>
+                          </div>
+                          <p className="text-slate-700 leading-relaxed text-sm sm:text-base">
+                            {q.e}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {qIndex < questions.length - 1 && <hr className="mt-12 border-slate-100" />}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-16 pt-8 border-t border-slate-200">
+                {error && (
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-md shadow-sm flex items-center animate-pulse">
+                    <i className="fa-solid fa-circle-exclamation text-red-500 mr-3 text-xl flex-shrink-0"></i>
+                    <p className="text-red-700 font-medium">{error}</p>
+                  </div>
+                )}
+
+                {!isSubmitted ? (
+                  <button
+                    onClick={handleSubmit}
+                    className="w-full sm:w-auto mx-auto flex items-center justify-center bg-gradient-to-r from-slate-800 to-slate-900 text-white px-10 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                  >
+                    採点する
+                    <i className="fa-solid fa-chevron-right ml-2 text-xl"></i>
+                  </button>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button
+                      onClick={startQuiz}
+                      className="w-full sm:w-auto flex items-center justify-center bg-gradient-to-r from-amber-600 to-amber-700 text-white px-8 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                    >
+                      <i className="fa-solid fa-rotate-right mr-3 text-xl"></i>
+                      別の問題で再挑戦する
+                    </button>
+                    <button
+                      onClick={() => setCurrentView('learn')}
+                      className="w-full sm:w-auto flex items-center justify-center bg-white border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-full font-bold text-lg shadow-sm hover:bg-slate-50 transition-all duration-300"
+                    >
+                      <i className="fa-solid fa-file-lines mr-3 text-xl"></i>
+                      FQAで復習する
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- Reactのマウント処理 ---
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
