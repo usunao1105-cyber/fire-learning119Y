@@ -127,7 +127,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 5</div>
-      <div class="lesson-desc">現場指揮官・最先着救急隊用 初動報告</div>
+      <div class="lesson-desc">指揮統制・戦術評価システム</div>
       <a href="lesson5/index.html" class="button">▶ 学習する</a>
     </div>
 
