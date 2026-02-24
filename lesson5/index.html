@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tactical Commander - 消防隊長 指揮統制評価システム</title>
+  
+  <!-- Tailwind CSS (スタイリング用) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome (アイコン用) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- React & ReactDOM (機能用) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (ブラウザ内でReactコードを変換するため) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* 印刷時のスタイル調整用 */
+    @media print {
+      .print\:hidden { display: none !important; }
+      .print\:shadow-none { box-shadow: none !important; }
+      .print\:border-none { border: none !important; }
+      .print\:p-0 { padding: 0 !important; }
+      .print\:pb-4 { padding-bottom: 1rem !important; }
+      body { background-color: white !important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Reactアプリが描画される場所 -->
+  <div id="root"></div>
+
+  <!-- ここからReactのプログラム -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- データ定義 ---
+
+    // シナリオ生成用のデータソース
+    const scenarioData = {
+      buildings: [
+        "木造2階建て一般住宅", "耐火造4階建て共同住宅", "5階建て雑居ビル", 
+        "大規模工場（一部危険物貯蔵）", "木造平屋建て空き家", "高層マンション（10階部分）", "地下街飲食店"
+      ],
+      times: ["深夜（午前2時）", "早朝（午前6時）", "昼間（午後1時）", "夕方（午後6時）", "夜間（午後9時）"],
+      weather: ["晴れ・無風・乾燥", "強風（風速10m/s以上）", "大雨", "降雪・路面凍結", "濃霧"],
+      conditions: [
+        "1階窓から黒煙と炎が激しく噴出", "2階部分から白煙がにじみ出ている", "屋上へ延焼の危険大",
+        "建物全体が火の海（最盛期）", "外観上は異常なし、焦げ臭い匂いのみ", "隣接する木造家屋に延焼中"
+      ],
+      victims: [
+        "逃げ遅れ1名あり（2階寝室）", "情報錯綜、不在の可能性もあるが確証なし", 
+        "複数名がベランダで救助を求めている", "全員避難済み（関係者確認）", "不明（要検索）"
+      ],
+      hazards: [
+        "道路狭隘で消防車進入困難（ホース延長必要）", "最寄りの消火栓が工事中で使用不可",
+        "付近に多数の野次馬で混乱", "プロパンガスボンベへの延焼危険あり", "特になし"
+      ],
+      // 時間経過で発生するイベント群
+      events: [
+        "建物内部から「助けて！」という要救助者の声が聞こえる",
+        "建物内部で「ドーン」という小規模な爆発音が発生する",
+        "風向きが急変し、隣接建物への延焼危険が急激に高まる",
+        "要救助者の家族が現場に駆けつけ、パニック状態で進入しようとする",
+        "2階の床（1階の天井）が一部崩落する音がする",
+        "付近の消火栓の水圧が急激に低下する",
+        "これまで煙のなかった別の窓から、新たに濃煙が噴出し始める",
+        "現場に到着した警察官から「中に人がいるかもしれない」と情報提供がある",
+        "建物内から「シュー」というガスが漏れるような異音が聞こえる",
+        "活動中の隊員から「熱気が急に強くなった」と緊急無線の報告が入る"
+      ]
+    };
+
+    // 評価カテゴリー
+    const evaluationCategories = [
+      { id: "sizeup", name: "情報収集・状況判断", icon: <i className="fas fa-wave-square text-[18px]"></i> },
+      { id: "initial", name: "初期手配・応援要請", icon: <i className="fas fa-walkie-talkie text-[18px]"></i> },
+      { id: "tactics", name: "部隊配置・戦術決定", icon: <i className="fas fa-fire text-[18px]"></i> },
+      { id: "safety", name: "安全管理・退避基準", icon: <i className="fas fa-shield text-[18px]"></i> },
+      { id: "communication", name: "隊員への指示・情報共有", icon: <i className="fas fa-users text-[18px]"></i> }
+    ];
+
+    // --- メインコンポーネント ---
+
+    const App = () => {
+      const [activeTab, setActiveTab] = useState('generator');
+      const [scenario, setScenario] = useState(null);
+      const [commands, setCommands] = useState([]);
+      const [newCommandTime, setNewCommandTime] = useState('');
+      const [newCommandText, setNewCommandText] = useState('');
+      const [newCommandCategory, setNewCommandCategory] = useState('sizeup');
+      const [overallComment, setOverallComment] = useState('');
+
+      // メディカルラリー形式用のタイマー状態
+      const [timeLimit, setTimeLimit] = useState(10);
+      const [timeRemaining, setTimeRemaining] = useState(10 * 60);
+      const [elapsedTime, setElapsedTime] = useState(0);
+      const [isRunning, setIsRunning] = useState(false);
+
+      // イベント発生用の状態
+      const [scheduledEvents, setScheduledEvents] = useState([]);
+      const [triggeredEvents, setTriggeredEvents] = useState([]);
+      const [customEvents, setCustomEvents] = useState([]); 
+      const [newEventMin, setNewEventMin] = useState(''); 
+      const [newEventSec, setNewEventSec] = useState(''); 
+      const [newEventText, setNewEventText] = useState(''); 
+
+      // 印刷案内メッセージ表示用
+      const [showPrintMessage, setShowPrintMessage] = useState(false);
+
+      useEffect(() => {
+        if (!isRunning && elapsedTime === 0) {
+          setScheduledEvents(customEvents.map(ev => ({ ...ev, isTriggered: false })));
+          setTriggeredEvents([]);
+        }
+      }, [customEvents, isRunning, elapsedTime]);
+
+      useEffect(() => {
+        if (isRunning && scheduledEvents.length > 0) {
+          const newlyTriggered = scheduledEvents.filter(
+            ev => !ev.isTriggered && elapsedTime >= ev.triggerTime
+          );
+          
+          if (newlyTriggered.length > 0) {
+            setScheduledEvents(prev => prev.map(ev => 
+              newlyTriggered.find(n => n.id === ev.id) ? { ...ev, isTriggered: true } : ev
+            ));
+            
+            const newEvents = newlyTriggered.map(ev => ({
+              ...ev,
+              triggeredAt: formatTime(elapsedTime)
+            }));
+            setTriggeredEvents(prev => [...prev, ...newEvents]);
+          }
+        }
+      }, [elapsedTime, isRunning, scheduledEvents]);
+
+      useEffect(() => {
+        let interval = null;
+        if (isRunning && timeRemaining > 0) {
+          interval = setInterval(() => {
+            setTimeRemaining(prev => prev - 1);
+            setElapsedTime(prev => prev + 1);
+          }, 1000);
+        } else if (timeRemaining === 0) {
+          setIsRunning(false);
+        }
+        return () => clearInterval(interval);
+      }, [isRunning, timeRemaining]);
+
+      useEffect(() => {
+        if (!isRunning) {
+          setTimeRemaining(timeLimit * 60);
+          setElapsedTime(0);
+          setTriggeredEvents([]);
+        }
+      }, [timeLimit]);
+
+      const formatTime = (totalSeconds) => {
+        const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const s = (totalSeconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+      };
+
+      const generateScenario = () => {
+        const randomSelect = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        const newScenario = {
+          building: randomSelect(scenarioData.buildings),
+          time: randomSelect(scenarioData.times),
+          weather: randomSelect(scenarioData.weather),
+          condition: randomSelect(scenarioData.conditions),
+          victim: randomSelect(scenarioData.victims),
+          hazard: randomSelect(scenarioData.hazards),
+          generatedAt: new Date().toLocaleString()
+        };
+        setScenario(newScenario);
+        setCommands([]); 
+        setIsRunning(false);
+        setTimeRemaining(timeLimit * 60);
+        setElapsedTime(0);
+        setTriggeredEvents([]);
+
+        const eventCount = Math.floor(Math.random() * 2) + 2;
+        const shuffledEvents = [...scenarioData.events].sort(() => 0.5 - Math.random()).slice(0, eventCount);
+        const totalSeconds = timeLimit * 60;
+        const minTime = totalSeconds * 0.1;
+        const maxTime = totalSeconds * 0.9;
+        
+        const initialEvents = shuffledEvents.map((text, index) => {
+           const triggerTime = Math.floor(minTime + Math.random() * (maxTime - minTime));
+           return { id: `evt-custom-${Date.now()}-${index}`, triggerTime, text };
+        }).sort((a, b) => a.triggerTime - b.triggerTime);
+
+        setCustomEvents(initialEvents);
+      };
+
+      const addCustomEvent = () => {
+        if (!newEventText.trim()) return;
+        const min = parseInt(newEventMin) || 0;
+        const sec = parseInt(newEventSec) || 0;
+        const triggerTime = min * 60 + sec;
+
+        const newEvent = {
+          id: `evt-custom-${Date.now()}`,
+          triggerTime,
+          text: newEventText
+        };
+
+        const updated = [...customEvents, newEvent].sort((a, b) => a.triggerTime - b.triggerTime);
+        setCustomEvents(updated);
+        setNewEventText('');
+        setNewEventMin('');
+        setNewEventSec('');
+      };
+
+      const removeCustomEvent = (id) => {
+        setCustomEvents(customEvents.filter(ev => ev.id !== id));
+      };
+
+      useEffect(() => {
+        generateScenario();
+      }, []);
+
+      const addCommand = () => {
+        if (!newCommandText.trim()) return;
+        
+        const newCmd = {
+          id: Date.now().toString(),
+          time: newCommandTime || formatTime(elapsedTime),
+          text: newCommandText,
+          category: newCommandCategory,
+          score: 0, 
+          feedback: ''
+        };
+        setCommands([...commands, newCmd]);
+        setNewCommandText('');
+        setNewCommandTime(''); 
+      };
+
+      const removeCommand = (id) => {
+        setCommands(commands.filter(cmd => cmd.id !== id));
+      };
+
+      const updateEvaluation = (id, field, value) => {
+        setCommands(commands.map(cmd => 
+          cmd.id === id ? { ...cmd, [field]: value } : cmd
+        ));
+      };
+
+      const calculateResults = () => {
+        const evaluatedCommands = commands.filter(c => c.score > 0);
+        const totalScore = evaluatedCommands.reduce((sum, c) => sum + c.score, 0);
+        const maxScore = evaluatedCommands.length * 5;
+        const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+
+        const categoryScores = evaluationCategories.map(cat => {
+          const catCommands = evaluatedCommands.filter(c => c.category === cat.id);
+          const catTotal = catCommands.reduce((sum, c) => sum + c.score, 0);
+          const catMax = catCommands.length * 5;
+          return {
+            ...cat,
+            score: catTotal,
+            max: catMax,
+            percentage: catMax > 0 ? Math.round((catTotal / catMax) * 100) : 0,
+            count: catCommands.length
+          };
+        });
+
+        return { totalScore, maxScore, percentage, categoryScores, evaluatedCount: evaluatedCommands.length };
+      };
+
+      const results = calculateResults();
+
+      return (
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-12">
+          {/* ヘッダー */}
+          <header className="bg-slate-900 text-white shadow-md">
+            <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+              <div className="flex items-center space-x-3 mb-4 md:mb-0">
+                <div className="bg-red-600 p-2 rounded-lg">
+                  <i className="fas fa-fire text-[28px] text-white"></i>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold tracking-wider">Tactical Commander</h1>
+                  <p className="text-xs text-slate-400 font-medium">消防小隊長 指揮統制・戦術評価システム</p>
+                </div>
+              </div>
+              <nav className="flex bg-slate-800 p-1 rounded-lg">
+                <button 
+                  onClick={() => setActiveTab('generator')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'generator' ? 'bg-red-600 text-white shadow' : 'text-slate-300 hover:text-white'}`}
+                >
+                  シナリオ作成
+                </button>
+                <button 
+                  onClick={() => setActiveTab('evaluator')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'evaluator' ? 'bg-red-600 text-white shadow' : 'text-slate-300 hover:text-white'}`}
+                >
+                  指揮評価入力
+                </button>
+                <button 
+                  onClick={() => setActiveTab('report')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'report' ? 'bg-red-600 text-white shadow' : 'text-slate-300 hover:text-white'}`}
+                >
+                  評価レポート
+                </button>
+              </nav>
+            </div>
+          </header>
+
+          <main className="max-w-6xl mx-auto px-4 mt-8">
+            
+            {/* タブ1: シナリオジェネレーター */}
+            {activeTab === 'generator' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="bg-slate-800 px-6 py-4 flex justify-between items-center text-white">
+                    <div className="flex items-center space-x-2">
+                      <i className="fas fa-fire text-[20px] text-red-400"></i>
+                      <h2 className="text-lg font-bold">ブラインド想定ジェネレーター</h2>
+                    </div>
+                    <button 
+                      onClick={generateScenario}
+                      className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow"
+                    >
+                      <i className="fas fa-sync-alt text-[16px]"></i>
+                      <span>新規想定を生成</span>
+                    </button>
+                  </div>
+
+                  {scenario && (
+                    <div className="p-6 md:p-8">
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 mb-6">
+                        <p className="text-sm text-slate-500 mb-2 font-mono">ID: {scenario.generatedAt}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
+                          <div className="space-y-4">
+                            <div>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">対象物</span>
+                              <p className="text-lg font-bold text-slate-800 pb-1 border-b border-slate-200">{scenario.building}</p>
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">発生日時・天候</span>
+                              <p className="text-md font-medium text-slate-700 pb-1 border-b border-slate-200">{scenario.time} / {scenario.weather}</p>
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">燃焼状況・外観</span>
+                              <p className="text-md font-medium text-red-600 pb-1 border-b border-slate-200">{scenario.condition}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-4">
+                            <div>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">要救助者情報</span>
+                              <p className="text-md font-medium text-amber-600 pb-1 border-b border-slate-200 flex items-center">
+                                <i className="fas fa-users text-[16px] mr-2"></i>
+                                {scenario.victim}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">特記事項・障害</span>
+                              <p className="text-md font-medium text-slate-700 pb-1 border-b border-slate-200 flex items-center">
+                                <i className="fas fa-exclamation-triangle text-[16px] mr-2 text-red-500"></i>
+                                {scenario.hazard}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 border-t border-slate-200 pt-6">
+                        <div className="flex items-center space-x-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-6 inline-flex">
+                          <div className="bg-slate-100 p-2 rounded">
+                            <i className="fas fa-clock text-[20px] text-slate-600"></i>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-500 font-bold block mb-1">ラリー制限時間設定</label>
+                            <select 
+                              value={timeLimit}
+                              onChange={(e) => setTimeLimit(Number(e.target.value))}
+                              className="border border-slate-300 rounded p-1 text-sm focus:ring-2 focus:ring-red-500 outline-none bg-white font-bold text-slate-700"
+                            >
+                              <option value={5}>5分</option>
+                              <option value={10}>10分</option>
+                              <option value={15}>15分</option>
+                              <option value={20}>20分</option>
+                              <option value={30}>30分</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* イベント・シナリオ設定 */}
+                        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm mb-8">
+                          <h3 className="text-md font-bold text-slate-800 mb-2 flex items-center">
+                            <i className="fas fa-bolt text-[18px] mr-2 text-amber-500"></i>
+                            イベント・シナリオ設定（時間経過による状況変化）
+                          </h3>
+                          <p className="text-xs text-slate-500 mb-4">
+                            設定した時間に到達すると、訓練画面にイベントが通知されます。評価者が自由にシナリオを構築できます。
+                          </p>
+
+                          <div className="space-y-2 mb-4">
+                            {customEvents.length === 0 ? (
+                              <p className="text-sm text-slate-400 italic bg-slate-50 p-3 rounded border border-dashed border-slate-200 text-center">設定されたイベントはありません。</p>
+                            ) : (
+                              customEvents.map((ev) => (
+                                <div key={ev.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 p-2 rounded shadow-sm">
+                                  <div className="flex items-center space-x-3">
+                                    <span className="text-sm font-mono font-bold bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">
+                                      {formatTime(ev.triggerTime)}
+                                    </span>
+                                    <span className="text-sm font-medium text-slate-800">{ev.text}</span>
+                                  </div>
+                                  <button 
+                                    onClick={() => removeCustomEvent(ev.id)}
+                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                  >
+                                    <i className="fas fa-trash-alt text-[16px]"></i>
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+
+                          <div className="flex flex-col md:flex-row gap-3 items-end border-t border-slate-100 pt-4 mt-2">
+                            <div className="flex space-x-2 w-full md:w-auto">
+                              <div>
+                                <label className="text-xs text-slate-500 font-bold mb-1 block">発生（分）</label>
+                                <input 
+                                  type="number" min="0" max="60"
+                                  value={newEventMin} onChange={e => setNewEventMin(e.target.value)}
+                                  className="w-16 border border-slate-300 rounded p-2 text-sm outline-none" placeholder="0"
+                                />
+                              </div>
+                              <div className="flex items-end pb-2 font-bold text-slate-400">:</div>
+                              <div>
+                                <label className="text-xs text-slate-500 font-bold mb-1 block">発生（秒）</label>
+                                <input 
+                                  type="number" min="0" max="59"
+                                  value={newEventSec} onChange={e => setNewEventSec(e.target.value)}
+                                  className="w-16 border border-slate-300 rounded p-2 text-sm outline-none" placeholder="0"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 w-full">
+                              <label className="text-xs text-slate-500 font-bold mb-1 block">イベント内容（状況変化、要救助者の声など）</label>
+                              <input 
+                                type="text" 
+                                value={newEventText} onChange={e => setNewEventText(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && addCustomEvent()}
+                                className="w-full border border-slate-300 rounded p-2 text-sm outline-none" 
+                                placeholder="例: 2階から「助けて！」という声が聞こえる"
+                              />
+                            </div>
+                            <button 
+                              onClick={addCustomEvent}
+                              disabled={!newEventText.trim()}
+                              className="bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white px-4 py-2 rounded font-bold transition flex items-center h-[38px] shrink-0 w-full md:w-auto justify-center shadow-sm"
+                            >
+                              <i className="fas fa-plus text-[16px] mr-1"></i> 追加
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                          <button 
+                            onClick={() => setActiveTab('evaluator')}
+                            className="bg-slate-800 hover:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold transition shadow-lg flex items-center justify-center space-x-2 w-full md:w-auto text-lg"
+                          >
+                            <span>この想定・シナリオで評価を開始する</span>
+                            <i className="fas fa-play text-[20px] ml-1"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg flex items-start">
+                  <i className="fas fa-wave-square text-[20px] shrink-0 mt-0.5 mr-3"></i>
+                  <div className="text-sm">
+                    <p className="font-bold mb-1">ジェネレーターの使い方</p>
+                    <p>「新規想定を生成」ボタンを押すことで、火災想定がランダムに生成されます。小隊長（評価対象者）にはこの想定の限られた情報だけを付与し、現場到着時からの指示や手配を「指揮評価入力」タブで記録・評価してください。</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* タブ2: 指揮評価入力 */}
+            {activeTab === 'evaluator' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* メディカルラリー風タイマー */}
+                <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-700 p-4 flex flex-col md:flex-row items-center justify-between text-white">
+                  <div className="flex items-center space-x-4 mb-4 md:mb-0">
+                    <i className={`fas fa-clock text-[36px] ${isRunning ? "text-red-400 animate-pulse" : "text-slate-400"}`}></i>
+                    <div>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">
+                        {timeRemaining === 0 ? 'TIME UP!' : '残り時間 / 経過時間'}
+                      </p>
+                      <div className="flex items-baseline space-x-3">
+                        <span className={`text-4xl font-mono font-black ${timeRemaining <= 60 && timeRemaining > 0 ? 'text-red-500 animate-pulse' : timeRemaining === 0 ? 'text-red-600' : 'text-white'}`}>
+                          {formatTime(timeRemaining)}
+                        </span>
+                        <span className="text-xl font-mono text-slate-400 font-medium">
+                          / {formatTime(elapsedTime)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2 w-full md:w-auto">
+                    {!isRunning ? (
+                      <button 
+                        onClick={() => setIsRunning(true)}
+                        disabled={timeRemaining === 0}
+                        className="flex-1 md:flex-none flex items-center justify-center space-x-1 bg-red-600 hover:bg-red-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-lg font-bold transition shadow-md"
+                      >
+                        <i className="fas fa-play text-[20px]"></i>
+                        <span>{elapsedTime === 0 ? '訓練開始 (START)' : '再開'}</span>
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => setIsRunning(false)}
+                        className="flex-1 md:flex-none flex items-center justify-center space-x-1 bg-amber-500 hover:bg-amber-400 text-white px-6 py-3 rounded-lg font-bold transition shadow-md"
+                      >
+                        <i className="fas fa-pause text-[20px]"></i>
+                        <span>一時停止</span>
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setIsRunning(false);
+                        setTimeRemaining(timeLimit * 60);
+                        setElapsedTime(0);
+                        setTriggeredEvents([]);
+                        setScheduledEvents(prev => prev.map(ev => ({ ...ev, isTriggered: false })));
+                      }}
+                      className="flex items-center justify-center space-x-1 bg-slate-700 hover:bg-slate-600 text-white px-4 py-3 rounded-lg font-bold transition"
+                      title="タイマーとイベントをリセット"
+                    >
+                      <i className="fas fa-stop text-[20px]"></i>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 現在のシナリオ概要 */}
+                {scenario && (
+                   <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm flex items-center justify-between">
+                     <div className="flex items-center space-x-4">
+                        <div className="bg-slate-100 p-2 rounded">
+                          <i className="fas fa-fire text-[24px] text-red-500"></i>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 font-bold">現在の想定</p>
+                          <p className="text-sm font-medium">{scenario.building} / {scenario.condition}</p>
+                        </div>
+                     </div>
+                     <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-bold">訓練中</span>
+                   </div>
+                )}
+
+                {/* イベント（状況変化）発生表示エリア */}
+                {triggeredEvents.length > 0 && (
+                  <div className="space-y-3">
+                    {triggeredEvents.map((ev, index) => {
+                      const isLatest = index === triggeredEvents.length - 1;
+                      return (
+                        <div 
+                          key={ev.id} 
+                          className={`p-4 rounded-lg border flex items-start space-x-3 transition-all duration-500 ${
+                            isLatest 
+                              ? 'bg-amber-50 border-amber-300 shadow-md animate-in slide-in-from-top-4' 
+                              : 'bg-white border-slate-200 opacity-70'
+                          }`}
+                        >
+                          <div className={`p-2 rounded-full shrink-0 ${isLatest ? 'bg-amber-200 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {isLatest ? <i className="fas fa-bolt text-[20px] animate-pulse"></i> : <i className="fas fa-bell text-[20px]"></i>}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded ${isLatest ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+                                状況変化
+                              </span>
+                              <span className="text-xs font-mono font-bold text-slate-500">{ev.triggeredAt}</span>
+                              {isLatest && <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">NEW</span>}
+                            </div>
+                            <p className={`font-bold text-base ${isLatest ? 'text-amber-900' : 'text-slate-700'}`}>
+                              {ev.text}
+                            </p>
+                            {isLatest && (
+                              <p className="text-xs text-amber-700 mt-1 font-medium bg-amber-100/50 p-1.5 rounded inline-block">
+                                ※ 評価者は、小隊長にこの情報を伝達し、その後の指示を評価してください。
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 指示の記録エリア */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="bg-slate-800 px-6 py-4 text-white">
+                    <h2 className="text-lg font-bold flex items-center">
+                      <i className="fas fa-clipboard-check text-[20px] mr-2 text-emerald-400"></i>
+                      指揮・命令タイムラインの記録と評価
+                    </h2>
+                  </div>
+                  
+                  <div className="p-6">
+                    {/* 新規指示入力フォーム */}
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-8">
+                      <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center">
+                        <span className="relative flex h-3 w-3 mr-2">
+                          {isRunning && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>}
+                          <span className={`relative inline-flex rounded-full h-3 w-3 ${isRunning ? 'bg-red-500' : 'bg-slate-400'}`}></span>
+                        </span>
+                        隊長の指示をリアルタイム記録
+                      </h3>
+                      <div className="flex flex-col md:flex-row gap-4">
+                        <div className="w-full md:w-32">
+                          <label className="text-xs text-slate-500 font-bold mb-1 block">経過時間（手動修正可）</label>
+                          <input 
+                            type="text" 
+                            placeholder={formatTime(elapsedTime)}
+                            value={newCommandTime}
+                            onChange={(e) => setNewCommandTime(e.target.value)}
+                            className="w-full border border-slate-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none font-mono"
+                          />
+                        </div>
+                        <div className="w-full md:w-48">
+                          <label className="text-xs text-slate-500 font-bold mb-1 block">カテゴリー</label>
+                          <select 
+                            value={newCommandCategory}
+                            onChange={(e) => setNewCommandCategory(e.target.value)}
+                            className="w-full border border-slate-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none bg-white"
+                          >
+                            {evaluationCategories.map(cat => (
+                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-slate-500 font-bold mb-1 block">指示・行動の内容</label>
+                          <div className="flex space-x-2">
+                            <input 
+                              type="text" 
+                              placeholder="例: 本部へ現着報告、木造2階建てから黒煙噴出、特命小隊の出動を要請する。" 
+                              value={newCommandText}
+                              onChange={(e) => setNewCommandText(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && addCommand()}
+                              className="flex-1 border border-slate-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            />
+                            <button 
+                              onClick={addCommand}
+                              disabled={!newCommandText.trim()}
+                              className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-300 text-white px-4 py-2 rounded font-medium transition flex items-center"
+                            >
+                              <i className="fas fa-plus text-[16px] mr-1"></i> 追加
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 記録されたタイムライン */}
+                    <div className="space-y-4">
+                      {commands.length === 0 ? (
+                        <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
+                          <i className="fas fa-walkie-talkie text-[48px] mx-auto mb-3 opacity-20"></i>
+                          <p>まだ指示が記録されていません。<br/>訓練を開始し、隊長の指示や行動を記録してください。</p>
+                        </div>
+                      ) : (
+                        commands.map((cmd, index) => {
+                          const category = evaluationCategories.find(c => c.id === cmd.category);
+                          return (
+                            <div key={cmd.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition shadow-sm bg-white relative pl-4 md:pl-6">
+                              {/* タイムラインの線 */}
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-200"></div>
+                              <div className="absolute left-[-5px] top-6 w-3 h-3 rounded-full bg-red-500 border-2 border-white"></div>
+                              
+                              <div className="flex flex-col lg:flex-row justify-between gap-4">
+                                {/* 左側：指示内容 */}
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <span className="text-xs font-mono font-bold bg-slate-100 px-2 py-1 rounded text-slate-600">{cmd.time}</span>
+                                    <span className="text-xs font-bold px-2 py-1 rounded flex items-center space-x-1 bg-blue-50 text-blue-700 border border-blue-100">
+                                      {category?.icon}
+                                      <span style={{marginLeft: '4px'}}>{category?.name}</span>
+                                    </span>
+                                  </div>
+                                  <p className="text-slate-800 font-medium text-base mb-3 p-3 bg-slate-50 rounded border-l-4 border-slate-400">
+                                    「{cmd.text}」
+                                  </p>
+                                  
+                                  <div className="w-full">
+                                    <input 
+                                      type="text" 
+                                      placeholder="評価コメント（任意）: 例「的確な状況判断である」「部隊への指示が曖昧」" 
+                                      value={cmd.feedback}
+                                      onChange={(e) => updateEvaluation(cmd.id, 'feedback', e.target.value)}
+                                      className="w-full border-b border-slate-300 bg-transparent py-1 text-sm focus:border-red-500 outline-none transition-colors"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* 右側：評価入力 */}
+                                <div className="w-full lg:w-64 shrink-0 flex flex-col justify-center border-t lg:border-t-0 lg:border-l border-slate-200 pt-4 lg:pt-0 lg:pl-4 relative">
+                                   <button 
+                                      onClick={() => removeCommand(cmd.id)}
+                                      className="absolute top-0 right-0 lg:-top-2 lg:-right-2 p-1 text-slate-300 hover:text-red-500 transition-colors"
+                                      title="この記録を削除"
+                                    >
+                                      <i className="fas fa-trash-alt text-[16px]"></i>
+                                   </button>
+                                   <p className="text-xs text-center text-slate-500 font-bold mb-2">この指示の評価</p>
+                                   <div className="flex justify-between items-center bg-slate-50 p-1 rounded-full border border-slate-200">
+                                      {[1, 2, 3, 4, 5].map((score) => (
+                                        <button
+                                          key={score}
+                                          onClick={() => updateEvaluation(cmd.id, 'score', score)}
+                                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                                            cmd.score === score 
+                                              ? 'bg-red-600 text-white shadow-md transform scale-110' 
+                                              : 'text-slate-500 hover:bg-slate-200'
+                                          }`}
+                                        >
+                                          {score}
+                                        </button>
+                                      ))}
+                                   </div>
+                                   <div className="flex justify-between text-[10px] text-slate-400 mt-1 px-1">
+                                     <span>要改善</span>
+                                     <span>優秀</span>
+                                   </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 総合所見入力 */}
+                {commands.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center">
+                      <i className="fas fa-clipboard-check text-[18px] mr-2 text-slate-500"></i>
+                      指揮官としての総合所見
+                    </h3>
+                    <textarea 
+                      value={overallComment}
+                      onChange={(e) => setOverallComment(e.target.value)}
+                      placeholder="訓練全体の指揮統制に対する講評、良かった点、改善点を入力してください。"
+                      className="w-full h-24 border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none resize-none"
+                    ></textarea>
+                    
+                    <div className="mt-4 flex justify-end">
+                       <button 
+                          onClick={() => setActiveTab('report')}
+                          className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold transition shadow-md flex items-center space-x-2"
+                        >
+                          <i className="fas fa-check-circle text-[18px]"></i>
+                          <span style={{marginLeft: '4px'}}>評価を完了しレポートを作成</span>
+                        </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* タブ3: 評価レポート */}
+            {activeTab === 'report' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* アクションボタン */}
+                <div className="flex justify-end space-x-3 print:hidden relative mb-4">
+                   {showPrintMessage && (
+                     <div className="absolute right-0 top-12 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg shadow-lg z-10 w-80 animate-in fade-in slide-in-from-top-2">
+                       <p className="text-sm font-bold mb-1 flex items-center">
+                         <i className="fas fa-exclamation-triangle text-[16px] text-blue-500 mr-1"></i>
+                         プレビューが開かない場合
+                       </p>
+                       <p className="text-xs">
+                         お使いの環境によっては、ボタンから印刷画面が開かない場合があります。<br/>
+                         お手数ですが、キーボードの <strong>Ctrl + P</strong>（Macは <strong>Command + P</strong>）を押してブラウザの印刷機能をお試しください。
+                       </p>
+                     </div>
+                   )}
+                   <button 
+                     onClick={() => {
+                       window.print();
+                       setShowPrintMessage(true);
+                       setTimeout(() => setShowPrintMessage(false), 8000);
+                     }}
+                     className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition shadow-sm flex items-center"
+                   >
+                     <i className="fas fa-save text-[16px] mr-2"></i> PDFで保存 / 印刷
+                   </button>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8 print:shadow-none print:border-none print:p-0">
+                  
+                  {/* レポートヘッダー */}
+                  <div className="border-b-2 border-slate-800 pb-6 mb-6 text-center">
+                    <h1 className="text-3xl font-black text-slate-900 tracking-wider mb-2">
+                      指揮統制評価レポート
+                    </h1>
+                    <p className="text-slate-500 font-medium">TACTICAL COMMANDER EVALUATION</p>
+                  </div>
+
+                  {/* スコアサマリー */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <div className="md:col-span-1 bg-slate-900 rounded-xl p-6 text-white flex flex-col justify-center items-center text-center shadow-inner">
+                      <i className="fas fa-award text-[48px] text-amber-400 mb-2"></i>
+                      <p className="text-sm font-bold text-slate-300 mb-1">総合評価</p>
+                      <div className="flex items-baseline space-x-2">
+                        <span className="text-5xl font-black">{results.percentage}</span>
+                        <span className="text-xl text-slate-400">%</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-2">
+                        {results.totalScore} / {results.maxScore} pts ({results.evaluatedCount}件の指示を評価)
+                      </p>
+                    </div>
+
+                    <div className="md:col-span-2 space-y-4">
+                      <h3 className="text-sm font-bold text-slate-700 border-b border-slate-200 pb-2">カテゴリー別評価</h3>
+                      {results.categoryScores.map(cat => (
+                        <div key={cat.id} className="flex items-center">
+                          <div className="w-40 flex items-center space-x-2 text-sm font-medium text-slate-600">
+                            {cat.icon}
+                            <span className="truncate" style={{marginLeft: '4px'}}>{cat.name}</span>
+                          </div>
+                          <div className="flex-1 ml-4 relative h-4 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`absolute top-0 left-0 h-full rounded-full transition-all duration-1000 ${
+                                cat.percentage >= 80 ? 'bg-emerald-500' :
+                                cat.percentage >= 60 ? 'bg-blue-500' :
+                                cat.percentage >= 40 ? 'bg-amber-500' :
+                                cat.percentage > 0 ? 'bg-red-500' : 'bg-slate-300'
+                              }`}
+                              style={{ width: `${cat.percentage}%` }}
+                            ></div>
+                          </div>
+                          <div className="w-16 text-right text-sm font-bold text-slate-700 ml-4">
+                            {cat.count > 0 ? `${cat.percentage}%` : '-'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* シナリオ情報 */}
+                  {scenario && (
+                    <div className="mb-8">
+                      <h3 className="text-lg font-bold text-slate-800 mb-3 border-l-4 border-slate-800 pl-3">訓練想定状況</h3>
+                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 text-sm grid grid-cols-2 gap-4">
+                        <div><span className="text-slate-500 mr-2">対象物:</span> <span className="font-bold">{scenario.building}</span></div>
+                        <div><span className="text-slate-500 mr-2">日時・天候:</span> <span className="font-bold">{scenario.time} / {scenario.weather}</span></div>
+                        <div><span className="text-slate-500 mr-2">燃焼状況:</span> <span className="font-bold">{scenario.condition}</span></div>
+                        <div><span className="text-slate-500 mr-2">要救助者:</span> <span className="font-bold">{scenario.victim}</span></div>
+                        <div className="col-span-2"><span className="text-slate-500 mr-2">特記事項:</span> <span className="font-bold text-red-600">{scenario.hazard}</span></div>
+                      </div>
+                      
+                      {/* 発生した状況変化をレポートにも記載 */}
+                      {triggeredEvents.length > 0 && (
+                        <div className="mt-4 border-t border-slate-200 pt-4 px-2">
+                          <p className="text-sm font-bold text-slate-700 mb-2 flex items-center">
+                            <i className="fas fa-bolt text-[16px] text-amber-500 mr-1"></i>
+                            活動中に発生した状況変化
+                          </p>
+                          <ul className="space-y-1">
+                            {triggeredEvents.map((ev, i) => (
+                              <li key={i} className="text-sm text-slate-700 flex items-start">
+                                <span className="font-mono font-bold text-slate-500 mr-2 shrink-0">[{ev.triggeredAt}]</span>
+                                <span>{ev.text}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 指揮タイムライン詳細 */}
+                  <div className="mb-8">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4 border-l-4 border-slate-800 pl-3">指示・命令タイムライン詳細</h3>
+                    <div className="space-y-0 border-l-2 border-slate-200 ml-3">
+                      {commands.map((cmd) => {
+                        const category = evaluationCategories.find(c => c.id === cmd.category);
+                        return (
+                          <div key={cmd.id} className="relative pl-6 pb-6 print:pb-4 break-inside-avoid">
+                            <div className="absolute left-[-5px] top-1 w-2 h-2 rounded-full bg-slate-400"></div>
+                            <div className="flex flex-col md:flex-row md:items-baseline mb-1">
+                              <span className="font-mono font-bold text-slate-600 mr-3">{cmd.time}</span>
+                              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 mr-3">
+                                {category?.name}
+                              </span>
+                              {cmd.score > 0 && (
+                                <span className="text-xs font-bold text-white bg-slate-700 px-2 py-0.5 rounded">
+                                  評価: {cmd.score}/5
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-slate-800 font-bold mb-1 ml-2">「{cmd.text}」</p>
+                            {cmd.feedback && (
+                              <p className="text-sm text-slate-600 bg-blue-50 p-2 rounded ml-2 border-l-2 border-blue-400 inline-block">
+                                <span className="font-bold text-blue-800 mr-1">講評:</span>
+                                {cmd.feedback}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {commands.length === 0 && (
+                         <p className="text-slate-500 italic pl-6">指示の記録がありません。</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 総合所見 */}
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-3 border-l-4 border-slate-800 pl-3">総合所見</h3>
+                    <div className="bg-slate-50 rounded-lg p-6 border border-slate-200 whitespace-pre-wrap min-h-[100px]">
+                      {overallComment || <span className="text-slate-400 italic">総合所見は入力されていません。</span>}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+          </main>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
