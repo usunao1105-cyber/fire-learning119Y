@@ -133,7 +133,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 6</div>
-      <div class="lesson-desc">EMS MEMO</div>
+      <div class="lesson-desc">救助統制・戦術評価システム</div>
       <a href="lesson6/index.html" class="button">▶ 学習する</a>
     </div>
 
