@@ -139,7 +139,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 7</div>
-      <div class="lesson-desc">交通事故MEMO</div>
+      <div class="lesson-desc">オンライン指揮統制評価ルーム</div>
       <a href="lesson7/index.html" class="button">▶ 学習する</a>
     </div>
 
