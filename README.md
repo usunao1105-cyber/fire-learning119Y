@@ -145,7 +145,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 8</div>
-      <div class="lesson-desc">現場の調査記録</div>
+      <div class="lesson-desc">子供向けFMB</div>
       <a href="lesson8/index.html" class="button">▶ 学習する</a>
     </div>
 
