@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ファーストミッション クイズ！</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (JSXをブラウザでコンパイルするため) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- カスタムアニメーション -->
+  <style>
+    @keyframes fade-in-up {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+      animation: fade-in-up 0.5s ease-out forwards;
+    }
+    @keyframes bounce-short {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .animate-bounce-short {
+      animation: bounce-short 1s ease-in-out;
+    }
+    .animate-spin-slow {
+      animation: spin 3s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-cyan-100 via-white to-yellow-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- アイコンコンポーネント ---
+    const Sparkles = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+    );
+    const Trophy = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+    );
+    const RefreshCw = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    );
+    const CheckCircle = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    );
+    const XCircle = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    );
+    const BookOpen = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    );
+    const AlertCircle = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    );
+
+    // --- クイズデータ ---
+    const rawText = `第1問：大地震が起きてお家に住めなくなったとき、みんなが一時的に安全に過ごす場所を何というかな？
+ア) 公園
+イ) 避難所（ひなんじょ）
+ウ) コンビニ
+エ) ゆうえんち正解: イ理由: 地震や台風でお家が危なくなったとき、みんなが一時的に安全に過ごせる場所を「避難所」というよ。
+第2問：大規模な災害のとき、なぜ市役所の人ではなく、避難してきた人たちで避難所を開ける必要があるの？
+ア) 道路が壊れて、市役所の人が来られないかもしれないから。
+イ) 市役所の人がお休みだから。
+ウ) みんなでゲームをするため。
+エ) カギが壊れているから。正解: ア理由: 大規模な災害のときは道路が通れなくなったりして、市役所の人がすぐに避難所へ来られるとは限らないからなんだよ。
+第3問：避難してきた人たちだけで、すぐに避難所を開けられるように用意された箱の名前は何かな？
+ア) ラッキーボックス
+イ) ファーストミッションボックス
+ウ) おもちゃばこ
+エ) サバイバルボックス正解: イ理由: 避難してきた人たちが自分の手ですぐに避難所を開設・運営できるように用意されたキットを「ファーストミッションボックス」と呼ぶよ。
+第4問：ファーストミッションボックスの「ミッション」とはどういう意味かな？
+ア) 遊び
+イ) 任務（やるべきこと）
+ウ) 買い物
+エ) 休憩正解: イ理由: 避難所に集まった人が「初めに（ファースト）やるべき任務（ミッション）」が書かれていることから、この名前がついているよ。
+第5問：ファーストミッションボックスは、市内のどこに置いてあるかな？
+ア) 全ての市立小学校の体育館の入り口付近
+イ) 警察署の前
+ウ) 公園の砂場
+エ) 市役所の屋上正解: ア理由: 災害時に避難所となる、市内47の全市立小学校の体育館の入り口付近（屋外）に設置されているんだ。
+第6問：ファーストミッションボックスにはカギがかかっているかな？
+ア) 暗証番号が必要
+イ) 鍵はかかっておらず、誰でも開けられる
+ウ) 校長先生しか開けられない
+エ) 100円を入れると開く正解: イ理由: 誰でもすぐに使えるように、箱にはカギがかかっていない無施錠（むせじょう）になっているよ。
+第7問：ファーストミッションボックスは、何人が集まったら開けて使い始めるかな？
+ア) 1人
+イ) 3人
+ウ) 50人
+エ) 100人正解: イ理由: 大規模災害が発生したとき、避難してきた人が3人以上集まったらミッションをスタートする仕組みになっているよ。
+第8問：箱を開けた最初の3人のうち、1人は全体のリーダーになります。その役職（役割の名前）は何かな？
+ア) 大統領
+イ) 校長先生
+ウ) 仮の本部長
+エ) キャプテン正解: ウ理由: 集まった3人の中から、これからの作業の中心となる「仮の本部長」を1名決めるんだよ。
+第9問：仮の本部長になった人以外の２人は、何班（なんはん）になるかな？
+ア) 料理班
+イ) おそうじ班
+ウ) 安全班
+エ) トイレ班正解: ウ理由: 本部長以外の残りの2名は「安全班」となって、建物の安全確認などに向かうよ。
+第10問：箱に入っている手順書（マニュアル）には、誰でも迷わずに行動できるように「ある工夫」がされています。それは何？
+ア) 答えが書かれたあぶり出しになっている
+イ) 周りの人に呼びかけるための「セリフ」がそのまま書いてある
+ウ) 音楽が鳴る
+エ) 英語で書かれている正解: イ理由: 特別な知識がなくても迷わず行動できるように、周りの人に呼びかけるための「セリフ」が用意されているんだ。
+第11問：最終的には、みんなで協力して最大何人で避難所の開設作業をするかな？
+ア) 3人
+イ) 17人
+ウ) 100人
+エ) 1000人正解: イ理由: 最初は3人でスタートし、他の避難者の協力も得て徐々に仲間を増やし、最大17人で開設作業を進めていくよ。
+第12問：避難所をつくるためのグループ（班）は、副本部長も含めると全部でいくつあるかな？
+ア) 2つ
+イ) 6つ
+ウ) 10個
+エ) 20個正解: イ理由: 本部長、副本部長、安全班、トイレ班、検温消毒班、住居班という6つの役割に分かれて協力して進めるよ。
+第13問：役割が決まった人は、自分の役割が周りの人にわかるように何を着るかな？
+ア) マント
+イ) ベスト
+ウ) エプロン
+エ) 着ぐるみ正解: イ理由: 箱に入っているベストを着て、周りの人に自分が何の係かすぐにわかるようにするんだ。
+第14問：ベストを着るとき、マーカーペンで両面に書き込むことは何かな？
+ア) 好きな食べ物
+イ) 役割と名前
+ウ) 年齢
+エ) 今日の天気正解: イ理由: 誰がどの班のリーダーかわかるように、ベストの表と裏の両面に役割と名前を記入して身につけるよ。
+第15問：箱にはメガホン（拡声器）が入っています。何のために使うのかな？
+ア) 歌を歌うため
+イ) 避難してきた人たちに大きな声で案内や指示をするため
+ウ) ボールをキャッチするため
+エ) 遠くの音を聞くため正解: イ理由: 避難してきたたくさんの人に、声掛けや指示をしっかり伝えるために使うんだよ。
+第16問：安全班の人は、ケガをしないように頭に何をかぶるかな？
+ア) 麦わら帽子
+イ) 折りたたみ式ヘルメット
+ウ) ニット帽
+エ) 水泳キャップ正解: イ理由: 落下物などから頭を守るため、箱に入っている折りたたみ式ヘルメットをかぶって安全確認に向かうよ。
+第17問：安全班の人は、作業で手をケガしないように何をつけるかな？
+ア) 軍手（ぐんて）やビニール手袋
+イ) 腕時計
+ウ) 指輪
+エ) ミトン正解: ア理由: 作業中に手を切ったり汚れたりするのを防ぐために、軍手やビニール手袋を身につけるんだ。
+第18問：暗いときのために、安全班の人は何を頭につけるかな？
+ア) ろうそく
+イ) ヘッドライト
+ウ) サンバイザー
+エ) 星のシール正解: イ理由: 停電していて暗い場所でも、両手を使って安全確認ができるようにヘッドライトをつけるよ。
+第19問：リーダーである「本部長」の主な役割は何かな？
+ア) ご飯をつくること
+イ) 避難所全体の動きを把握して、みんなに指示を出すこと
+ウ) ずっと寝ていること
+エ) 体育館で一人で遊ぶこと正解: イ理由: 本部長は組織のトップとして、全体の進行具合を把握し、各班に指示を出してまとめる役割があるよ。
+第20問：安全班の主な役割は何かな？
+ア) 建物の中や外に危険な場所がないか確認すること
+イ) 歌を歌って皆を励ますこと
+ウ) トイレの掃除をすること
+エ) お風呂を沸かすこと正解: ア理由: 地震で建物に亀裂ができていないか、危ないものが落ちてこないかなど、建物内外の安全確認を行うよ。
+第21問：避難してきた人が過ごす場所（居住スペース）をつくったり、受付をしたりする班は何班かな？
+ア) ご飯班
+イ) 安全班
+ウ) 住居班（じゅうきょはん）
+エ) おもちゃ班正解: ウ理由: 住居班は、体育館の床にテープで通路を作ったり、避難者の受け入れ（受付）を行う役割なんだ。
+第22問：トイレ班の主な役割は何かな？
+ア) 簡易トイレ（仮設トイレ）を組み立てて設置すること
+イ) トイレに絵を描くこと
+ウ) トイレで寝ること
+エ) 水で遊ぶこと正解: ア理由: 災害時は普通のトイレが使えなくなることが多いので、防災備蓄倉庫から資材を運んで簡易トイレを組み立てるよ。
+第23問：防災備蓄倉庫の「カギ（キーボックス）」を開けるため、暗証番号を聞き出す役割の人は誰かな？
+ア) 本部長
+イ) 副本部長（ふくほんぶちょう）
+ウ) トイレ班長
+エ) 子供たち正解: イ理由: 副本部長が市役所や町の役員から暗証番号を聞き出して倉庫を開け、中の資材を取り出す準備をするんだ。
+第24問：体育館の扉を開けるための「カギ」はどこに入っているかな？
+ア) 本部長のポケットの中
+イ) 警察の人が持っている
+ウ) 防災備蓄倉庫の中にある「資材収納箱」の中
+エ) 土の中に埋まっている正解: ウ理由: 体育館の鍵は、防災備蓄倉庫の中にある「資材収納箱」という箱に、手順書と一緒に入っているよ。
+第25問：体育館を開けたあと、そのカギをなくさないように管理するのは誰の役割かな？
+ア) トイレ班長
+イ) 副本部長
+ウ) おまわりさん
+エ) 先生正解: イ理由: 副本部長は、鍵の管理をしたり各班の進み具合をチェックしたりして、本部長をサポートする役割があるんだ。
+第26問：住居班の人たちが体育館の中に入って、一番最初に行うことは何かな？
+ア) 避難スペースの清掃（おそうじ）
+イ) ご飯を食べる
+ウ) マットで寝る
+エ) 鬼ごっこをする正解: ア理由: みんなが安全に過ごせるように、住居班はまず避難スペースの清掃（モップがけなど）から行うよ。
+第27問：住居班が体育館の中を掃除するとき、靴の上から履くものは何かな？
+ア) 長靴
+イ) スリッパ
+ウ) シューズカバー
+エ) ローラースケート正解: ウ理由: 土足で避難所を汚さないように、住居班セットの中にあるシューズカバーをつけて体育館の中に入るんだ。
+第28問：住居班が体育館の中に通路や部屋の区画を作るときに使う、床に貼るテープを何というかな？
+ア) セロハンテープ
+イ) 養生（ようじょう）テープ
+ウ) 両面テープ
+エ) ガムテープ正解: イ理由: 体育館の床を傷つけずにはがしやすいように、養生テープを使って通路や居住スペースの目印をつくるよ。
+第29問：養生テープと一緒に使って、通路の線の代わりにするヒモを何というかな？
+ア) 毛糸
+イ) タフロープ
+ウ) 輪ゴム
+エ) リボン正解: イ理由: タフロープを床に置いて、それがずれないように養生テープで数か所とめて通路のラインにするよ。
+第30問：体育館に作る通路の幅は、だいたいどれくらいにするかな？
+ア) 10センチ
+イ) 2メートル
+ウ) 10メートル
+エ) 1キロメートル正解: イ理由: 人や物資が安全に通れるように、大体2メートルくらいの幅で通路を作るよ。メジャーで正確に測らなくても大体で大丈夫なんだ。
+第31問：１つの家族が過ごす住居スペースは、どれくらいの広さで作るのが基本かな？
+ア) 1メートル四方
+イ) 3メートル四方
+ウ) 10メートル四方
+エ) 体育館ぜんぶ正解: イ理由: 1つの家族（世帯）あたり、3メートル×3メートルの広さを基本としてシートなどで区画をつくるよ。
+第32問：住居班が避難所に入ってくる人のために作る「受付」は、いくつあるかな？
+ア) 1つ
+イ) 2つ（一般用と発熱者用）
+ウ) 5つ
+エ) 10個正解: イ理由: 元気な人向けの「一般避難者用」と、熱がある人向けの「発熱者用」の2つの受付を分けて作るよ。
+第33問：熱がある人（発熱者）用の受付は、どこに作るのが正しいかな？
+ア) 一般の受付のすぐ隣
+イ) 一般の受付から離れた場所
+ウ) 体育館の真ん中
+エ) 倉庫の中正解: イ理由: 病気がほかの人にうつる（感染症の拡大）のを防ぐために、一般用からは離れた場所に設置する決まりになっているよ。
+第34問：地震で普通の水洗トイレが使えないとき、トイレ班は何を準備するかな？
+ア) バケツ
+イ) 簡易トイレ（テントや便座など）
+ウ) 新聞紙
+エ) 砂場正解: イ理由: 断水（水が出なくなること）すると普通のトイレが使えないので、防災備蓄倉庫からテントや仮設の便座を運んで簡易トイレを組み立てるよ。
+第35問：簡易トイレで使うトイレットペーパーは、どこから持ってくるかな？
+ア) 自分の家から
+イ) 学校の屋外トイレなど
+ウ) お店に買いに行く
+エ) 葉っぱを使う正解: イ理由: トイレ班の手順書には、トイレットペーパーは学校の屋外トイレから持ってくるように書かれているよ。
+第36問：簡易トイレに設置した袋で用を足したあと、その袋はどうするかな？
+ア) 水で流す
+イ) しっかり縛ってゴミ箱に捨てる
+ウ) そのまま置いておく
+エ) 窓から投げる正解: イ理由: 災害時のトイレは処理袋を使って用を足し、終わったらニオイや菌が漏れないようにしっかり縛って捨てるんだよ。
+第37問：縛ったトイレの袋は、何の箱を仮のゴミ箱にして捨てるかな？
+ア) ファーストミッションボックスの箱
+イ) 防災備蓄倉庫の資材収納箱（しざいしゅうのうばこ）
+ウ) ランドセル
+エ) ダンボール正解: イ理由: 中身を出し終わって空になった「資材収納箱」の中に大きなゴミ袋をセットして、仮のゴミ箱として使うんだ。
+第38問：検温消毒班が使う「消毒液」などは、どこから持ってくるかな？
+ア) 病院
+イ) 薬局
+ウ) 防災備蓄倉庫
+エ) コンビニ正解: ウ理由: 避難所の開設に必要な消毒液などの資材も、学校にある防災備蓄倉庫に準備されているから、そこから運んでくるよ。
+第39問：なぜ、受付をするよりも先に、別の場所で「検温（熱をはかること）と消毒」をするのかな？
+ア) 体育館の中で病気が広がるのを防ぐため
+イ) 挨拶の練習をするため
+ウ) 時間をつぶすため
+エ) クイズを出すため正解: ア理由: みんなが一緒に体育館に入ってから熱があることがわかると感染症が広がってしまうかもしれないから、入り口の前で先に確認するんだよ。
+第40問：手順書（マニュアル）を読むとき、みんなに伝わるようにどうやって読むのがいいかな？
+ア) 心の中で静かに読む
+イ) 周りの人に聞こえるように声に出して読む
+ウ) 早口言葉で読む
+エ) 歌いながら読む正解: イ理由: 手順書には、みんなに呼びかけるセリフが書かれています。周りの人に聞こえるように、はっきりと声に出して読むことが大切だよ。
+第41問：ファーストミッションボックスを使って避難所を開設する時間の目安は、だいたいどれくらいかな？
+ア) 1分
+イ) 約1時間
+ウ) 1日
+エ) 1週間正解: イ理由: 建物の大きさにもよるけれど、約1時間で受け入れをスタートできるように手順が作られているんだ。でも、慌てずしっかり作業することも大切だよ。
+第42問：ファーストミッションボックスの手順書には、普通の「マニュアル」とは違う特徴があります。それは何かな？
+ア) 自分で考えて自由に動くことが求められる
+イ) 指示通りに順番に行えば、誰でも同じように作業ができる
+ウ) 全部マンガで描かれている
+エ) パソコンがないと読めない正解: イ理由: マニュアルは自分で考えて判断する必要があるけれど、手順書は順番通りにやれば知識がない人でも確実にできるようになっているんだ。
+第43問：もし、安全班が確認したときに体育館のガラスが１枚でも割れていたら、その場所はどうするかな？
+ア) 気にせず遊ぶ
+イ) 避難所として使わない、または立ち入り禁止にする
+ウ) ガムテープで直す
+エ) みんなで割れたガラスを触る正解: イ理由: 少しでも危険がある場所は、避難者の安全を守るために絶対に使わない（または立ち入り禁止区域にする）という明確な基準があるんだよ。
+第44問：体育館のどこに受付や通路を作ればいいか書かれた「レイアウト図（地図）」はどこにあるかな？
+ア) インターネットで検索する
+イ) 手順書の中に書いてある
+ウ) 校長先生に聞く
+エ) 黒板に描いてある正解: イ理由: 各小学校の体育館に合わせたレイアウト図が、手順書の中に分かりやすく書いてあるから、それを見ながら準備するよ。
+第45問：安全班が建物の外と中を確認するのには、どれくらいの時間をかけてしっかり行うかな？
+ア) 1分
+イ) 約15分～1時間（あわてずしっかり）
+ウ) 10秒
+エ) 半日正解: イ理由: 建物の安全確認はとても重要なので、15分から1時間ほどかけて、慌てずにしっかりチェックリストに沿って確認するよ。
+第46問：もしもの時にファーストミッションボックスをうまく使うために、一番大切なことは何かな？
+ア) 普段から訓練で実際に箱を開けて使ってみること
+イ) 押し入れの奥にしまっておくこと
+ウ) おまじないをかけること
+エ) 見なかったことにすること正解: ア理由: いくら簡単でも、一度もやったことがないと迷ってしまいます。だから、地域の訓練で実際に箱を開けて体験しておくことがとても大切なんだ。
+第47問：避難所が開いたあと、そこで生活するためのルール作りや運営（お世話）は誰が中心になって行うかな？
+ア) 警察官
+イ) 避難してきた住民みんな（自分たち）
+ウ) 宇宙人
+エ) コンビニの店員さん正解: イ理由: 避難所はホテルとは違い、避難してきた人たちが協力し合って自分たちで運営する「一つの街」のような場所なんだよ。
+第48問：防災の言葉で、自分たちで助け合うことを「共助（きょうじょ）」といいます。では、自分の命を自分で守ることは何というかな？
+ア) 公助（こうじょ）
+イ) 自助（じじょ）
+ウ) 援助（えんじょ）
+エ) 友情（ゆうじょう）正解: イ理由: 自分の命や安全を自分で守ることを「自助」といい、これが防災の基本となるんだ。その上でみんなで助け合う「共助」が大切だよ。
+第49問：避難所はただ寝るだけの場所ではありません。他にはどんな役割があるかな？
+ア) お菓子を配る場所
+イ) 支援物資（水や食料など）の提供や、大切な情報が集まる場所
+ウ) 映画を見る場所
+エ) テストを受ける場所正解: イ理由: 生活するだけでなく、生きるための水や食料、元の生活に戻るための情報が集まる「地域の拠点」としての役割があるんだ。
+第50問：ファーストミッションボックスを通して、みんなに持ってほしい気持ちは何かな？
+ア) 誰かがやってくれるのをじっと待つ気持ち
+イ) 「自分たちの地域は自分たちで守る」という気持ち
+ウ) とにかく逃げ回る気持ち
+エ) お腹がすいた気持ち正解: イ理由: 大災害のときは市役所の人も被災しているかもしれません。だから、誰かに任せるのではなく、自分たちで協力して地域を守る力（防災意識）をつけてほしいと期待されているんだ。`;
+
+    // テキストからクイズデータを抽出する関数
+    const parseData = (text) => {
+      const questions = [];
+      const regex = /第\d+問：([\s\S]*?)ア\)([\s\S]*?)イ\)([\s\S]*?)ウ\)([\s\S]*?)エ\)([\s\S]*?)正解:\s*(ア|イ|ウ|エ)\s*理由:\s*([\s\S]*?)(?=第\d+問：|$)/g;
+      let match;
+      let id = 1;
+      const ansMap = { "ア": 0, "イ": 1, "ウ": 2, "エ": 3 };
+      
+      while ((match = regex.exec(text)) !== null) {
+        questions.push({
+          id: id++,
+          question: match[1].trim(),
+          options: [
+            match[2].trim(),
+            match[3].trim(),
+            match[4].trim(),
+            match[5].trim()
+          ],
+          answerIndex: ansMap[match[6].trim()],
+          reason: match[7].trim()
+        });
+      }
+      return questions;
+    };
+
+    // 配列をシャッフルする関数
+    const shuffleArray = (array) => {
+      const newArray = [...array];
+      for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+      }
+      return newArray;
+    };
+
+    function App() {
+      const [allQuestions, setAllQuestions] = useState([]);
+      const [currentQuestions, setCurrentQuestions] = useState([]);
+      const [userAnswers, setUserAnswers] = useState({});
+      const [isSubmitted, setIsSubmitted] = useState(false);
+      const [score, setScore] = useState(0);
+      const [errorMsg, setErrorMsg] = useState("");
+
+      // 初回レンダリング時にデータをパースして10問セット
+      useEffect(() => {
+        const parsed = parseData(rawText);
+        setAllQuestions(parsed);
+        setCurrentQuestions(shuffleArray(parsed).slice(0, 10));
+      }, []);
+
+      // 選択肢を選んだ時の処理
+      const handleSelect = (qId, oIndex) => {
+        if (isSubmitted) return;
+        setUserAnswers(prev => ({ ...prev, [qId]: oIndex }));
+        setErrorMsg(""); // エラーメッセージを消す
+      };
+
+      // 採点ボタンを押した時の処理
+      const handleSubmit = () => {
+        // 10問すべて回答されているかチェック
+        if (Object.keys(userAnswers).length < 10) {
+          setErrorMsg("まだ答えていない問題があるよ！ぜんぶ答えてから採点ボタンをおしてね。");
+          return;
+        }
+
+        let currentScore = 0;
+        currentQuestions.forEach(q => {
+          if (userAnswers[q.id] === q.answerIndex) {
+            currentScore++;
+          }
+        });
+        setScore(currentScore);
+        setIsSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      // 再挑戦ボタンを押した時の処理
+      const handleRetry = () => {
+        setUserAnswers({});
+        setIsSubmitted(false);
+        setScore(0);
+        setErrorMsg("");
+        setCurrentQuestions(shuffleArray(allQuestions).slice(0, 10));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      if (currentQuestions.length === 0) return <div className="p-8 text-center text-xl font-bold">じゅんび中...</div>;
+
+      return (
+        <div className="font-sans pb-20 text-gray-800">
+          
+          {/* ヘッダー部分 */}
+          <header className="bg-white shadow-sm py-6 px-4 mb-8 sticky top-0 z-50 border-b-4 border-yellow-300">
+            <div className="max-w-4xl mx-auto flex items-center justify-center gap-3">
+              <Sparkles className="text-yellow-400 w-8 h-8 md:w-10 md:h-10 animate-pulse" />
+              <h1 className="text-2xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-pink-500">
+                ファーストミッション クイズ！
+              </h1>
+              <Sparkles className="text-yellow-400 w-8 h-8 md:w-10 md:h-10 animate-pulse" />
+            </div>
+            {!isSubmitted && (
+              <p className="text-center text-gray-600 font-bold mt-2 md:text-lg">
+                全部で10問！正解だと思う答えをえらんでね！
+              </p>
+            )}
+          </header>
+
+          <main className="max-w-4xl mx-auto px-4">
+            
+            {/* 結果発表エリア (採点後のみ表示) */}
+            {isSubmitted && (
+              <div className="bg-white rounded-3xl shadow-xl p-8 mb-12 text-center border-8 border-yellow-400 transform transition-all duration-500 scale-100 animate-bounce-short">
+                <Trophy className="w-24 h-24 mx-auto text-yellow-500 mb-4 drop-shadow-md" />
+                <h2 className="text-3xl md:text-4xl font-extrabold text-gray-800 mb-4">けっかはっぴょう！</h2>
+                <p className="text-4xl md:text-5xl font-extrabold text-blue-600 mb-8">
+                  10問中 <span className="text-6xl md:text-8xl text-pink-500 drop-shadow-md">{score}</span> 問 正解！
+                </p>
+                <button
+                  onClick={handleRetry}
+                  className="inline-flex items-center justify-center bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 text-white font-extrabold py-4 px-8 md:py-5 md:px-10 rounded-full text-xl md:text-2xl shadow-xl transform transition-transform hover:scale-105 active:scale-95"
+                >
+                  <RefreshCw className="mr-2 w-6 h-6 md:w-8 md:h-8 animate-spin-slow" />
+                  ちがう問題に挑戦する！
+                </button>
+              </div>
+            )}
+
+            {/* 質問リストエリア */}
+            <div className="space-y-8 md:space-y-12">
+              {currentQuestions.map((q, index) => {
+                const isCorrect = userAnswers[q.id] === q.answerIndex;
+                const hasAnswered = userAnswers[q.id] !== undefined;
+
+                return (
+                  <div 
+                    key={q.id} 
+                    className={`bg-white rounded-3xl shadow-lg p-6 md:p-8 border-4 transition-all duration-300
+                      ${isSubmitted 
+                        ? (isCorrect ? 'border-green-400' : 'border-red-400') 
+                        : (hasAnswered ? 'border-blue-300 ring-4 ring-blue-100' : 'border-gray-200')}
+                    `}
+                  >
+                    {/* 質問番号と問題文 */}
+                    <div className="flex flex-col md:flex-row gap-4 mb-6 items-start">
+                      <div className="bg-gradient-to-br from-blue-500 to-cyan-400 text-white font-black text-xl md:text-2xl px-5 py-2 rounded-2xl shadow-md whitespace-nowrap">
+                        第 {index + 1} 問
+                      </div>
+                      <h3 className="text-xl md:text-2xl font-bold leading-relaxed text-gray-800 pt-1">
+                        {q.question}
+                      </h3>
+                    </div>
+
+                    {/* 選択肢ボタン */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+                      {q.options.map((opt, idx) => {
+                        const isSelected = userAnswers[q.id] === idx;
+                        const labels = ['ア', 'イ', 'ウ', 'エ'];
+                        
+                        // 状態ごとのボタンスタイル決定
+                        let btnStyle = "";
+                        if (!isSubmitted) {
+                          btnStyle = isSelected
+                            ? 'bg-yellow-300 border-yellow-500 text-yellow-900 shadow-inner scale-[0.98]'
+                            : 'bg-blue-50 border-blue-200 text-gray-700 hover:border-yellow-400 hover:bg-yellow-100 hover:-translate-y-1 shadow-sm';
+                        } else {
+                          if (idx === q.answerIndex) {
+                            btnStyle = 'bg-green-500 border-green-700 text-white shadow-lg scale-105 z-10';
+                          } else if (isSelected) {
+                            btnStyle = 'bg-red-400 border-red-600 text-white opacity-90';
+                          } else {
+                            btnStyle = 'bg-gray-100 border-gray-200 text-gray-400 opacity-50';
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={idx}
+                            disabled={isSubmitted}
+                            onClick={() => handleSelect(q.id, idx)}
+                            className={`relative w-full text-left p-4 md:p-5 rounded-2xl border-4 transition-all duration-200 font-bold text-lg md:text-xl flex items-center ${btnStyle}`}
+                          >
+                            <span className="shrink-0 inline-flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-white/60 rounded-full mr-3 shadow-sm border border-white/40 text-gray-800 font-black">
+                              {labels[idx]}
+                            </span>
+                            <span>{opt}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* 結果と解説 (採点後のみ表示) */}
+                    {isSubmitted && (
+                      <div className={`mt-8 p-6 rounded-2xl border-2 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} animate-fade-in-up`}>
+                        <div className="flex items-center gap-3 font-bold text-2xl md:text-3xl mb-4">
+                          {isCorrect ? (
+                            <>
+                              <CheckCircle className="text-green-500 w-10 h-10 md:w-12 md:h-12" />
+                              <span className="text-green-700">大正解！すごい！</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="text-red-500 w-10 h-10 md:w-12 md:h-12" />
+                              <span className="text-red-700">ざんねん… 正解は「{['ア','イ','ウ','エ'][q.answerIndex]}」だよ！</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm relative">
+                          <div className="absolute -top-3 left-6 bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                            <BookOpen className="w-4 h-4 mr-1" /> 理由・かいせつ
+                          </div>
+                          <p className="text-gray-700 font-medium leading-loose text-lg mt-2">
+                            {q.reason}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* アクションエリア (未回答警告・採点ボタン・再挑戦ボタン) */}
+            <div className="text-center mt-12 mb-8">
+              {errorMsg && (
+                <div className="mb-6 inline-flex items-center justify-center gap-2 bg-red-100 text-red-700 px-6 py-4 rounded-full font-bold text-lg shadow-sm border-2 border-red-300 animate-bounce">
+                  <AlertCircle className="w-6 h-6 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {!isSubmitted ? (
+                <button
+                  onClick={handleSubmit}
+                  className="inline-flex items-center justify-center bg-gradient-to-b from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white font-extrabold py-5 px-14 rounded-full text-2xl md:text-3xl shadow-xl border-b-8 border-green-800 transform transition-transform hover:translate-y-1 active:translate-y-3 active:border-b-0"
+                >
+                  <CheckCircle className="mr-3 w-8 h-8 md:w-10 md:h-10" />
+                  採点する！
+                </button>
+              ) : (
+                <button
+                  onClick={handleRetry}
+                  className="inline-flex items-center justify-center bg-gradient-to-b from-pink-400 to-orange-500 hover:from-pink-500 hover:to-orange-600 text-white font-extrabold py-5 px-10 rounded-full text-2xl md:text-3xl shadow-xl border-b-8 border-orange-700 transform transition-transform hover:translate-y-1 active:translate-y-3 active:border-b-0"
+                >
+                  <RefreshCw className="mr-3 w-8 h-8 md:w-10 md:h-10" />
+                  もう1回ちょうせんする！
+                </button>
+              )}
+            </div>
+            
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
