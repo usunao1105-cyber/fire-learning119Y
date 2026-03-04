@@ -50,7 +50,6 @@
         const QrCode = (p) => <Icon {...p} path={<><rect x="3" y="3" width="5" height="5" rx="1" ry="1"/><rect x="16" y="3" width="5" height="5" rx="1" ry="1"/><rect x="3" y="16" width="5" height="5" rx="1" ry="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></>} />;
         const Mail = (p) => <Icon {...p} path={<><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></>} />;
 
-
         // --- 初期データ構造 ---
         const INITIAL_DATA = {
             incidentNumber: '',
@@ -137,6 +136,21 @@
             useEffect(() => {
                 localStorage.setItem('ems-record-data', JSON.stringify(data));
             }, [data]);
+
+            // Cmd+P / Ctrl+P で印刷プレビュー＆印刷ダイアログを開くショートカット
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+                        e.preventDefault();
+                        setViewMode('preview'); // プレビュー画面に切り替え
+                        setTimeout(() => {
+                            window.print(); // 画面の切り替えを待ってから印刷画面を開く
+                        }, 500); 
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, []);
 
             const handleChange = (e) => {
                 const { name, value, type, checked } = e.target;
@@ -229,9 +243,16 @@
                     {viewMode === 'input' && <InputForm data={data} handleChange={handleChange} handleObservationChange={handleObservationChange} addObservation={addObservation} removeObservation={removeObservation} />}
                     {viewMode === 'preview' && (
                     <div className="flex flex-col items-center">
-                        <div className="mb-4 no-print w-full flex justify-end max-w-[210mm]">
-                        <button onClick={handlePrint} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded shadow">
-                            <Printer size={20} /> 印刷 / PDF保存
+                        <div className="mb-4 no-print w-full flex flex-col items-end max-w-[210mm] bg-yellow-50 p-4 border border-yellow-200 rounded text-sm text-gray-700">
+                        <div className="mb-3 w-full text-left font-bold text-yellow-800">
+                            💡 印刷・PDF保存について
+                        </div>
+                        <ul className="list-disc pl-5 mb-4 w-full text-left space-y-1">
+                            <li>PDFとして保存する場合は、開いた印刷画面のプリンター（送信先）を<strong>「PDFに保存」</strong>に変更してください。</li>
+                            <li>キーボードの <strong>「Command + P」</strong>(Mac) または <strong>「Ctrl + P」</strong>(Windows) を押すことでも、このプレビューと印刷画面を一発で呼び出せます。</li>
+                        </ul>
+                        <button onClick={handlePrint} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded shadow font-bold">
+                            <Printer size={20} /> 印刷 / PDF保存画面を開く
                         </button>
                         </div>
                         <PrintPreview data={data} />
