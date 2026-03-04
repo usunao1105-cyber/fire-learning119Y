@@ -151,7 +151,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 9</div>
-      <div class="lesson-desc">救急消耗品管理</div>
+      <div class="lesson-desc">救急活動記録票DX</div>
       <a href="lesson9/index.html" class="button">▶ 学習する</a>
     </div>
 
