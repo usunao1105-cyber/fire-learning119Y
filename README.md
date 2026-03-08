@@ -157,7 +157,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 10</div>
-      <div class="lesson-desc">アドレナリン管理票</div>
+      <div class="lesson-desc">多部隊合同 訓練シミュレーター</div>
       <a href="lesson10/index.html" class="button">▶ 学習する</a>
     </div>
 
