@@ -163,7 +163,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 11</div>
-      <div class="lesson-desc">救急車内分娩支援</div>
+      <div class="lesson-desc">捜索支援App</div>
       <a href="lesson11/index.html" class="button">▶ 学習する</a>
     </div>
 
