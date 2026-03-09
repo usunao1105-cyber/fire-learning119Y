@@ -257,15 +257,28 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    // updateDoc を追加インポート
     import { getFirestore, collection, onSnapshot, setDoc, doc, addDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // 1. Firebaseの初期化
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'rescue-map-demo';
-    let firebaseConfig = { apiKey: "demo-key", projectId: "demo-project" };
-    if (typeof __firebase_config !== 'undefined') {
+    // ⚠️重要: 以下の firebaseConfig を、先ほどFirebaseコンソールで取得したご自身のコードに丸ごと書き換えてください！
+    
+    let firebaseConfig = {
+      apiKey: "AIzaSyAW2Auv3KzKuT8EXJZaY_2bQzBfvYkn6y4",
+  　　authDomain: "rescuemap-a5d3a.firebaseapp.com",
+  　　projectId: "rescuemap-a5d3a",
+  　　storageBucket: "rescuemap-a5d3a.firebasestorage.app",
+  　　messagingSenderId: "1049099260873",
+  　　appId: "1:1049099260873:web:9b20c7beb7d5d27ea04e18"
+    };
+
+    const appId = 'rescue-map-demo-v1'; // アプリ識別用のID（このままでOKです）
+
+    // ※プレビュー環境用の設定読み込み（消さないでください）
+    if (typeof __firebase_config !== 'undefined' && __firebase_config) {
       try { firebaseConfig = JSON.parse(__firebase_config); } catch(e) {}
     }
+    const envAppId = typeof __app_id !== 'undefined' ? __app_id : appId;
+
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -803,7 +816,7 @@
 
     // --- Gemini API (LLM) 連携機能 ---
     async function callGeminiAPI(prompt, retries = 5) {
-      const apiKey = "AIzaSyAM1ZZibznTJZ9nSzWTrdw7zKyyBX8UmVM"; 
+      const apiKey = "AIzaSyAW2Auv3KzKuT8EXJZaY_2bQzBfvYkn6y4"; 
       
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
       const payload = {
