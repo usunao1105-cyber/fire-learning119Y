@@ -282,24 +282,25 @@
 
     const isPreview = typeof __firebase_config !== 'undefined';
 
-    // 🚨 ご自身のFirebase設定に書き換えてください！
-    let firebaseConfig = {
+    // 🚨 ご自身のFirebase設定
+    const firebaseConfig = {
       apiKey: "AIzaSyAW2Auv3KzKuT8EXJZaY_2bQzBfvYkn6y4",
-  　　authDomain: "rescuemap-a5d3a.firebaseapp.com",
-  　　projectId: "rescuemap-a5d3a",
-  　　storageBucket: "rescuemap-a5d3a.firebasestorage.app",
-  　　messagingSenderId: "1049099260873",
-  　　appId: "1:1049099260873:web:9b20c7beb7d5d27ea04e18"
+      authDomain: "rescuemap-a5d3a.firebaseapp.com",
+      projectId: "rescuemap-a5d3a",
+      storageBucket: "rescuemap-a5d3a.firebasestorage.app",
+      messagingSenderId: "1049099260873",
+      appId: "1:1049099260873:web:9b20c7beb7d5d27ea04e18"
     };
 
     let appId = "default-app-id";
+    let activeConfig = firebaseConfig;
 
     if (isPreview) {
-      firebaseConfig = JSON.parse(__firebase_config);
+      activeConfig = JSON.parse(__firebase_config);
       appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     }
 
-    const app = initializeApp(firebaseConfig);
+    const app = initializeApp(activeConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
@@ -323,7 +324,7 @@
     let myColor = "blue"; 
     let watchId = null;
     let pendingImageBase64 = null; 
-    let fullChatLog = []; // ★追加：テキスト出力用に全チャット履歴を保持
+    let fullChatLog = []; // テキスト出力用に全チャット履歴を保持
 
     const setupScreen = document.getElementById('setup-screen');
     const joinScreen = document.getElementById('join-screen');
@@ -568,7 +569,7 @@
           if (change.type === "added") {
             const data = change.doc.data();
             
-            // ★追加：テキスト出力用にログを保存する
+            // テキスト出力用にログを保存する
             let logTime = "";
             if (data.timestamp) {
               const dateObj = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
@@ -752,7 +753,7 @@
 
     // === UI制御関連 ===
     
-    // ★追加：チャットログをコピーする機能
+    // チャットログをコピーする機能
     document.getElementById('btn-export-chat').addEventListener('click', () => {
       if (fullChatLog.length === 0) {
         alert("コピーする通信ログがありません。");
@@ -761,7 +762,6 @@
       
       const textToCopy = "【捜索支援マップ 通信ログ】\n\n" + fullChatLog.join('\n\n');
       
-      // テキストエリアを隠して作成し、そこにテキストを入れてからコピーする（スマホやCanvas内対応）
       const textArea = document.createElement("textarea");
       textArea.value = textToCopy;
       textArea.style.position = "fixed";
