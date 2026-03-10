@@ -4,258 +4,140 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>捜索支援マップ</title>
-  
-  <!-- Tailwind CSS (スタイリング用) -->
+
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Leaflet (地図表示用) -->
+
+  <!-- Leaflet (地図ライブラリ) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <!-- QRCode.js (QRコード生成用) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- 📱 アプリ化（PWA・ホーム画面アイコン）の設定 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb"> <!-- スマホのステータスバーの色(青色) -->
+  <link rel="apple-touch-icon" href="icon-192.png"> <!-- iPhone用アイコン -->
+  <link rel="icon" type="image/png" href="icon-192.png"> <!-- ブラウザタブ用アイコン -->
+
+  <style>
+    /* 地図の高さ調整 */
+    #map { height: 100%; width: 100%; z-index: 10; }
+    /* チャットエリアのスクロールバーを隠す */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 h-screen overflow-hidden flex flex-col">
 
   <!-- ヘッダー -->
-  <header class="bg-blue-600 text-white p-3 flex justify-between items-center h-[60px] shadow-md z-20">
-    <div class="flex flex-col">
-      <h1 class="text-lg font-bold leading-tight">捜索支援マップ</h1>
-      <span id="header-session-name" class="text-xs font-normal text-blue-200 hidden"></span>
+  <header class="bg-blue-600 text-white p-3 shadow-md flex justify-between items-center z-20">
+    <div class="flex items-center">
+      <span class="text-xl mr-2">🚁</span>
+      <h1 class="text-lg font-bold">捜索支援マップ</h1>
     </div>
-    <div class="flex space-x-2">
-      <button id="btn-show-members" class="hidden bg-white text-gray-700 px-3 py-1 rounded text-sm font-semibold shadow">
-        隊員一覧
-      </button>
-      <button id="btn-export-chat" class="hidden bg-indigo-600 text-white px-3 py-1 rounded text-sm font-semibold shadow hover:bg-indigo-700 transition">
-        📄 履歴コピー
-      </button>
-      <button id="btn-show-qr" class="hidden bg-white text-blue-600 px-3 py-1 rounded text-sm font-semibold shadow">
-        QRコード表示
-      </button>
-      <button id="btn-leave-session" class="hidden bg-red-600 text-white px-3 py-1 rounded text-sm font-semibold shadow hover:bg-red-700 transition">
-        退出
-      </button>
-    </div>
+    <div id="status-badge" class="bg-gray-500 text-xs px-2 py-1 rounded-full font-bold">待機中</div>
   </header>
 
-  <!-- ビュー1: ホスト初期画面 (セッションなし) -->
-  <div id="view-host-init" class="flex-1 flex flex-col items-center justify-center p-6 hidden">
-    <div class="bg-white p-8 rounded-lg shadow-lg text-center max-w-sm w-full border-t-4 border-blue-600">
-      <h2 class="text-xl font-extrabold mb-2 text-gray-800 tracking-widest">新規オペレーション展開</h2>
-      <p class="text-xs text-gray-500 mb-6 font-semibold">現場の指揮統制ネットワーク(マップ・通信)を構築します。</p>
-      
-      <div class="mb-4 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-1">事案名・事案番号 (任意)</label>
-        <input type="text" id="session-name-input" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="例: 令和8年 第12号 山岳救助">
-      </div>
-      
-      <div class="mb-4 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-1">本部表示名</label>
-        <input type="text" id="host-name-input" value="指揮本部" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="表示名 (例: 指揮本部)">
-      </div>
-
-      <!-- 追加: マーカーの色選択 (ホスト用) -->
-      <div class="mb-6 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-2">本部のマーカー色</label>
-        <div class="flex justify-between px-2">
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="host-color" value="red" class="peer sr-only" checked>
-            <div class="w-6 h-6 rounded-full bg-red-500 peer-checked:ring-4 ring-offset-2 ring-red-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">赤</span>
-          </label>
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="host-color" value="blue" class="peer sr-only">
-            <div class="w-6 h-6 rounded-full bg-blue-500 peer-checked:ring-4 ring-offset-2 ring-blue-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">青</span>
-          </label>
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="host-color" value="green" class="peer sr-only">
-            <div class="w-6 h-6 rounded-full bg-green-500 peer-checked:ring-4 ring-offset-2 ring-green-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">緑</span>
-          </label>
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="host-color" value="orange" class="peer sr-only">
-            <div class="w-6 h-6 rounded-full bg-orange-500 peer-checked:ring-4 ring-offset-2 ring-orange-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">橙</span>
-          </label>
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="host-color" value="violet" class="peer sr-only">
-            <div class="w-6 h-6 rounded-full bg-purple-500 peer-checked:ring-4 ring-offset-2 ring-purple-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">紫</span>
-          </label>
-        </div>
-      </div>
-      
-      <button id="btn-create-session" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 tracking-widest shadow-md">
-        指揮本部を起動する
-      </button>
-    </div>
-  </div>
-
-  <!-- ビュー2: 参加者待機画面 (セッションあり、位置情報未許可) -->
-  <div id="view-join" class="flex-1 flex flex-col items-center justify-center p-6 hidden">
-    <div class="bg-white p-8 rounded-lg shadow-lg text-center max-w-sm w-full">
-      <h2 class="text-xl font-bold mb-2 text-gray-700">捜索隊に参加</h2>
-      <p id="join-session-name-display" class="text-sm font-bold text-blue-600 mb-4 min-h-[20px]"></p>
-      <p class="text-sm text-gray-500 mb-4">現場の状況と位置情報を共有するために参加します。入力された情報は本部の参加者把握・緊急連絡の目的でのみ使用されます。</p>
-      
-      <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-6 text-left rounded-r">
-        <p class="text-xs text-yellow-800 font-bold mb-1">⚠️ 位置情報の共有について</p>
-        <ul class="text-[11px] text-yellow-700 list-disc pl-4 space-y-1 leading-snug">
-          <li>ブラウザの確認が出たら<b>「許可」</b>を選択してください。</li>
-          <li>スマホの画面が暗くなる(スリープ状態)と、位置の送信が一時停止する場合があります。</li>
-          <li><b>定期的にこの画面を開き直すか、画面を点灯させたまま</b>捜索を行ってください。</li>
-        </ul>
-      </div>
-
-      <div class="mb-4 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-1">お名前 (本名)</label>
-        <input type="text" id="join-fullname-input" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="例: 消防 太郎">
-      </div>
-      
-      <div class="mb-4 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-1">所属</label>
-        <input type="text" id="join-affiliation-input" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="例: 〇〇市消防団 第1分団">
-      </div>
-      
-      <div class="mb-4 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-1">携帯電話番号</label>
-        <input type="tel" id="join-phone-input" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="例: 090-1234-5678">
-      </div>
-
-      <!-- 追加: 無線の入力欄 (任意) -->
-      <div class="mb-4 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-1">無線・コールサイン <span class="text-[10px] font-normal text-gray-500">(任意)</span></label>
-        <input type="text" id="join-radio-input" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="例: デジ簡 15ch, 本部1 など">
-      </div>
-
-      <div class="mb-4 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-1">マップ・チャット上の表示名</label>
-        <input type="text" id="join-name-input" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="例: 第1分団, A班など">
-      </div>
-
-      <!-- 追加: マーカーの色選択 (参加者用) -->
-      <div class="mb-6 text-left">
-        <label class="block text-xs font-bold text-gray-700 mb-2">あなたの班のマーカー色</label>
-        <div class="flex justify-between px-2">
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="join-color" value="blue" class="peer sr-only" checked>
-            <div class="w-6 h-6 rounded-full bg-blue-500 peer-checked:ring-4 ring-offset-2 ring-blue-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">青</span>
-          </label>
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="join-color" value="green" class="peer sr-only">
-            <div class="w-6 h-6 rounded-full bg-green-500 peer-checked:ring-4 ring-offset-2 ring-green-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">緑</span>
-          </label>
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="join-color" value="orange" class="peer sr-only">
-            <div class="w-6 h-6 rounded-full bg-orange-500 peer-checked:ring-4 ring-offset-2 ring-orange-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">橙</span>
-          </label>
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="join-color" value="violet" class="peer sr-only">
-            <div class="w-6 h-6 rounded-full bg-purple-500 peer-checked:ring-4 ring-offset-2 ring-purple-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">紫</span>
-          </label>
-          <label class="flex flex-col items-center cursor-pointer">
-            <input type="radio" name="join-color" value="grey" class="peer sr-only">
-            <div class="w-6 h-6 rounded-full bg-gray-500 peer-checked:ring-4 ring-offset-2 ring-gray-300"></div>
-            <span class="text-[10px] mt-1 text-gray-500">灰</span>
-          </label>
-        </div>
-      </div>
-      
-      <button id="btn-join-session" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
-        位置情報を共有して参加
-      </button>
-      <p id="join-error" class="text-red-500 text-xs mt-3 hidden"></p>
-    </div>
-  </div>
-
-  <!-- ビュー3: メイン画面 (マップとチャット) -->
-  <div id="view-main" class="flex-1 flex flex-col md:flex-row hidden w-full h-[calc(100vh-60px)]">
-    <!-- 地図領域 (PCでは左2/3、スマホでは上半分) -->
-    <div id="map" class="w-full h-1/2 md:h-full md:w-2/3 border-b-2 md:border-b-0 md:border-r-2 border-gray-300 z-10 relative"></div>
+  <!-- メインコンテンツ（初期画面） -->
+  <div id="setup-screen" class="flex-1 flex flex-col items-center justify-center p-6 bg-white overflow-y-auto z-30 relative">
+    <h2 class="text-2xl font-bold mb-6 text-blue-800">運用開始</h2>
     
-    <!-- チャット領域 (PCでは右1/3、スマホでは下半分) -->
-    <div id="chat-container" class="w-full h-1/2 md:h-full md:w-1/3 flex flex-col bg-gray-50 relative">
-      <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 pb-20">
-        <!-- メッセージがここに追加される -->
-        <div class="text-center text-xs text-gray-400 my-2">通信を開始しました</div>
+    <button id="btn-start-hq" class="w-full max-w-sm bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg mb-4 text-lg transition duration-200">
+      🏢 新規オペレーション展開 (本部)
+    </button>
+    
+    <div class="my-4 text-gray-400 font-bold">または</div>
+    
+    <div class="w-full max-w-sm border-2 border-dashed border-gray-300 p-6 rounded-lg text-center">
+      <p class="text-sm text-gray-600 mb-4">現場の隊員は、本部が提示するQRコードをカメラで読み込んで参加してください。</p>
+      <div class="text-4xl text-gray-300">📱🔍</div>
+    </div>
+  </div>
+
+  <!-- QRコード表示モーダル (本部用) -->
+  <div id="modal-qr" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl text-center max-w-sm w-full relative">
+      <button id="btn-close-qr" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+      <h3 class="text-lg font-bold mb-2 text-blue-800">隊員追加QRコード</h3>
+      <p class="text-xs text-gray-600 mb-4">現場隊員のスマホカメラで読み込ませてください</p>
+      <div id="qrcode-container" class="flex justify-center bg-white p-2 mb-4 border-2 border-gray-200 rounded"></div>
+      <div class="text-xs text-gray-500 break-all bg-gray-100 p-2 rounded" id="share-url"></div>
+    </div>
+  </div>
+
+  <!-- 参加情報入力画面 (現場隊員用) -->
+  <div id="join-screen" class="fixed inset-0 bg-white z-40 flex flex-col items-center justify-center p-6 hidden">
+    <h2 class="text-2xl font-bold mb-2 text-blue-800">捜索ネットワークに参加</h2>
+    <p class="text-sm text-gray-600 mb-6">あなたの情報を入力して現場に合流します。</p>
+    
+    <div class="w-full max-w-sm space-y-4">
+      <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2">氏名 または コールサイン</label>
+        <input type="text" id="input-name" class="shadow appearance-none border rounded w-full py-3 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="例: 鈴木 小隊長">
       </div>
+      <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2">連絡先 (任意)</label>
+        <input type="tel" id="input-phone" class="shadow appearance-none border rounded w-full py-3 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="090-XXXX-XXXX">
+      </div>
+      <button id="btn-join" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg mt-4 transition duration-200">
+        現場に合流する
+      </button>
+    </div>
+  </div>
+
+  <!-- マップ＆チャット画面 -->
+  <div id="map-chat-screen" class="flex-1 flex flex-col hidden relative h-full">
+    
+    <!-- マップエリア -->
+    <div class="flex-1 relative">
+      <div id="map"></div>
       
-      <!-- メッセージ入力フォーム -->
-      <div class="absolute bottom-0 w-full bg-white p-2 border-t border-gray-200 flex items-center shadow-lg">
-        <!-- 追加: 写真添付ボタン -->
-        <button id="btn-attach-img" class="text-gray-500 hover:text-blue-600 p-2 text-xl" title="写真を添付">
-          📷
+      <!-- 本部用ツールボタン群 -->
+      <div id="hq-tools" class="absolute top-2 right-2 z-[400] flex flex-col space-y-2 hidden">
+        <button id="btn-show-qr" class="bg-white p-2 rounded shadow-md border border-gray-300 hover:bg-gray-100" title="QRコードを表示">
+          📱 追加
         </button>
-        <!-- 追加: 隠しファイル選択用 (画像のみ許可) -->
-        <input type="file" id="chat-image-input" accept="image/*" class="hidden">
-        
-        <input type="text" id="chat-input" class="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="状況を報告...">
-        <button id="btn-send-msg" class="ml-2 bg-blue-600 text-white rounded-full p-2 w-10 h-10 flex items-center justify-center hover:bg-blue-700">
+        <button id="btn-toggle-members" class="bg-white p-2 rounded shadow-md border border-gray-300 hover:bg-gray-100" title="隊員一覧">
+          👥 一覧
+        </button>
+      </div>
+
+      <!-- 現場用ツールボタン群 -->
+      <div id="field-tools" class="absolute top-2 right-2 z-[400] flex flex-col space-y-2 hidden">
+        <button id="btn-my-location" class="bg-white p-2 rounded shadow-md border border-gray-300 hover:bg-gray-100 text-blue-600 font-bold" title="現在地に戻る">
+          📍 現在地
+        </button>
+        <button id="btn-leave" class="bg-white p-2 rounded shadow-md border border-red-300 text-red-600 hover:bg-red-50" title="退出する">
+          🚪 退出
+        </button>
+      </div>
+    </div>
+
+    <!-- 隊員一覧パネル (本部用) -->
+    <div id="members-panel" class="absolute top-0 right-0 w-64 h-2/3 bg-white shadow-xl z-[500] transform translate-x-full transition-transform duration-300 flex flex-col border-l border-gray-200">
+      <div class="bg-blue-100 p-3 font-bold text-blue-800 flex justify-between items-center border-b">
+        隊員一覧
+        <button id="btn-close-members" class="text-gray-500 hover:text-gray-800">&times;</button>
+      </div>
+      <div id="members-list" class="flex-1 overflow-y-auto p-2 space-y-2 text-sm">
+        <!-- 隊員リストがここに入る -->
+      </div>
+    </div>
+
+    <!-- チャットエリア (下部) -->
+    <div class="h-1/3 bg-white flex flex-col border-t border-gray-300 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+      <!-- メッセージ表示部 -->
+      <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2 no-scrollbar bg-gray-50">
+        <div class="text-center text-xs text-gray-400 my-2">-- 通信ログ開始 --</div>
+      </div>
+      <!-- 入力部 -->
+      <div class="p-2 bg-gray-200 flex items-center space-x-2 pb-safe">
+        <input type="text" id="chat-input" class="flex-1 rounded-full py-2 px-4 border border-gray-300 focus:outline-none focus:border-blue-500 text-sm" placeholder="メッセージを送信...">
+        <button id="btn-send-chat" class="bg-blue-600 text-white rounded-full p-2 w-10 h-10 flex items-center justify-center hover:bg-blue-700 shadow">
           ➤
         </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 画像拡大モーダル (追加) -->
-  <div id="modal-image" class="fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center hidden">
-    <button id="btn-close-image" class="absolute top-4 right-4 text-white text-3xl font-bold">&times;</button>
-    <img id="modal-image-content" class="max-w-full max-h-full object-contain p-2">
-  </div>
-
-  <!-- QRコードモーダル -->
-  <div id="modal-qr" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
-    <div class="bg-white p-6 rounded-lg shadow-xl text-center max-w-xs w-full relative">
-      <button id="btn-close-qr" class="absolute top-2 right-3 text-gray-500 text-xl font-bold">&times;</button>
-      <h3 class="text-lg font-bold mb-2">参加用QRコード</h3>
-      <p class="text-xs text-gray-500 mb-4">隊員にこの画面を読み込ませてください</p>
-      <div id="qrcode" class="flex justify-center mb-4 bg-gray-50 p-2 rounded"></div>
-      <p class="text-xs text-blue-500 break-all select-all border p-2 rounded bg-blue-50" id="share-url"></p>
-    </div>
-  </div>
-
-  <!-- チャット履歴コピー用モーダル -->
-  <div id="modal-export-chat" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
-    <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-2xl max-h-[90vh] flex flex-col relative">
-      <button id="btn-close-export" class="absolute top-2 right-3 text-gray-500 text-xl font-bold">&times;</button>
-      <h3 class="text-lg font-bold mb-2">📄 チャット履歴</h3>
-      <p class="text-xs text-gray-500 mb-2">メモ帳などに貼り付けて記録として保存してください。</p>
-      <div id="export-content" class="flex-1 overflow-y-auto bg-gray-50 p-4 border rounded text-sm whitespace-pre-wrap font-mono select-all"></div>
-      <button id="btn-copy-export" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition duration-200">
-        クリップボードにコピー
-      </button>
-    </div>
-  </div>
-
-  <!-- 隊員一覧モーダル -->
-  <div id="modal-members" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
-    <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-2xl max-h-[90vh] flex flex-col relative">
-      <button id="btn-close-members" class="absolute top-2 right-3 text-gray-500 text-xl font-bold">&times;</button>
-      <h3 class="text-lg font-bold mb-2">📋 隊員・連絡先一覧</h3>
-      <p class="text-xs text-gray-500 mb-4">現在参加中の隊員情報です。<br>電話番号をタップすると発信できます。</p>
-      <!-- 横スクロールできるように overflow-x-auto を追加 -->
-      <div class="flex-1 overflow-y-auto overflow-x-auto">
-        <table class="min-w-full text-left text-sm whitespace-nowrap">
-          <thead class="uppercase tracking-wider border-b-2 border-gray-300 bg-gray-50">
-            <tr>
-              <th class="px-4 py-2">表示名</th>
-              <th class="px-4 py-2">本名</th>
-              <th class="px-4 py-2">所属</th>
-              <th class="px-4 py-2">電話番号</th>
-              <th class="px-4 py-2">無線</th>
-              <th class="px-4 py-2 text-center">マップ表示 <span class="text-[10px] font-normal text-red-500">(本部のみ)</span></th> <!-- 追加 -->
-            </tr>
-          </thead>
-          <tbody id="members-table-body" class="divide-y divide-gray-200">
-            <!-- JavaScriptで動的に追加 -->
-          </tbody>
-        </table>
       </div>
     </div>
   </div>
@@ -276,16 +158,28 @@
     </div>
   </div>
 
-  <!-- Firebase 連携スクリプト -->
+  <!-- ========================================== -->
+  <!-- Firebase 連携 & アプリのメインプログラム   -->
+  <!-- ========================================== -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot, setDoc, doc, addDoc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    // 📱 【重要】PWA (Service Worker) の登録処理
+    // この記述があることで「ホーム画面に追加」が可能になります
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(registration => {
+          console.log('ServiceWorker 登録成功:', registration.scope);
+        }).catch(err => {
+          console.log('ServiceWorker 登録失敗:', err);
+        });
+      });
+    }
 
-    // 1. Firebaseの初期化
-    // ⚠️重要: 以下の firebaseConfig を、先ほどFirebaseコンソールで取得したご自身のコードに丸ごと書き換えてください！
-    
-    let firebaseConfig = {
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot, setDoc, doc, addDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // 🚨 【重要】ご自身のFirebase設定に書き換えてください！
+    const firebaseConfig = {
       apiKey: "AIzaSyAW2Auv3KzKuT8EXJZaY_2bQzBfvYkn6y4",
   　　authDomain: "rescuemap-a5d3a.firebaseapp.com",
   　　projectId: "rescuemap-a5d3a",
@@ -294,687 +188,377 @@
   　　appId: "1:1049099260873:web:9b20c7beb7d5d27ea04e18"
     };
 
-    const appId = 'rescue-map-demo-v1'; // アプリ識別用のID（このままでOKです）
-
-    // ※プレビュー環境用の設定読み込み（消さないでください）
-    if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-      try { firebaseConfig = JSON.parse(__firebase_config); } catch(e) {}
-    }
-    const envAppId = typeof __app_id !== 'undefined' ? __app_id : appId;
-
+    // Firebaseの初期化
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // 状態管理
-    let currentUser = null;
-    let currentSessionId = new URLSearchParams(window.location.search).get('s');
+    // グローバル変数
     let map = null;
-    let myMarker = null;
-    let otherMarkers = {};
+    let markers = {}; // { userId: L.marker }
+    let currentUser = null;
+    let currentRole = null; // 'hq' or 'field'
+    let operationId = null; 
+    let myName = "本部";
     let watchId = null;
-    let isFirstLocation = true;
-    let userName = ""; 
-    let userFullName = ""; 
-    let userAffiliation = ""; 
-    let userPhone = ""; 
-    let userRadio = ""; 
-    let userColor = "blue"; 
-    let currentMessages = [];
-    let activeMembers = {}; 
-    let isHost = false; // 追加: 本部権限かどうかの判定フラグ
 
     // DOM要素
-    const viewHostInit = document.getElementById('view-host-init');
-    const viewJoin = document.getElementById('view-join');
-    const viewMain = document.getElementById('view-main');
-    const btnCreateSession = document.getElementById('btn-create-session');
-    const btnJoinSession = document.getElementById('btn-join-session');
-    const btnShowQr = document.getElementById('btn-show-qr');
-    const btnLeaveSession = document.getElementById('btn-leave-session'); 
-    const btnShowMembers = document.getElementById('btn-show-members'); 
-    const btnExportChat = document.getElementById('btn-export-chat');
-    const modalQr = document.getElementById('modal-qr');
-    const modalExportChat = document.getElementById('modal-export-chat');
-    const modalMembers = document.getElementById('modal-members'); 
-    const modalLeave = document.getElementById('modal-leave'); 
-    const modalImage = document.getElementById('modal-image'); // 追加
-    const btnCloseExport = document.getElementById('btn-close-export');
-    const btnCloseMembers = document.getElementById('btn-close-members'); 
-    const btnCancelLeave = document.getElementById('btn-cancel-leave'); 
-    const btnConfirmLeave = document.getElementById('btn-confirm-leave'); 
-    const btnCloseImage = document.getElementById('btn-close-image'); // 追加
-    const modalImageContent = document.getElementById('modal-image-content'); // 追加
-    const membersTableBody = document.getElementById('members-table-body'); 
-    const exportContent = document.getElementById('export-content');
-    const btnCopyExport = document.getElementById('btn-copy-export');
+    const setupScreen = document.getElementById('setup-screen');
+    const joinScreen = document.getElementById('join-screen');
+    const mapChatScreen = document.getElementById('map-chat-screen');
+    const statusBadge = document.getElementById('status-badge');
+    const hqTools = document.getElementById('hq-tools');
+    const fieldTools = document.getElementById('field-tools');
     const chatMessages = document.getElementById('chat-messages');
     const chatInput = document.getElementById('chat-input');
-    const btnSendMsg = document.getElementById('btn-send-msg');
-    const btnAttachImg = document.getElementById('btn-attach-img'); // 追加
-    const chatImageInput = document.getElementById('chat-image-input'); // 追加
+    
+    // URLからOperation IDを取得 (QRコードで参加した場合)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlOpId = urlParams.get('op');
 
-    // 追加: カラー別のアイコン定義
-    const baseIconProps = {
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    };
-    const markerIcons = {
-      red: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', ...baseIconProps }),
-      blue: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', ...baseIconProps }),
-      green: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', ...baseIconProps }),
-      orange: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', ...baseIconProps }),
-      violet: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png', ...baseIconProps }),
-      grey: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', ...baseIconProps })
-    };
-
-    // 2. 匿名認証の実行
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("認証エラー:", error);
-      }
-    };
-
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        currentUser = user;
-        checkRoute();
-      }
-    });
-
-    // 3. 画面の振り分け
-    function checkRoute() {
-      if (!currentSessionId) {
-        viewHostInit.classList.remove('hidden');
-      } else {
-        viewJoin.classList.remove('hidden');
-        
-        const sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', currentSessionId);
-        getDoc(sessionRef).then((docSnap) => {
-          if (docSnap.exists() && docSnap.data().name) {
-            document.getElementById('join-session-name-display').textContent = `事案: ${docSnap.data().name}`;
-          }
-        }).catch(e => console.error("事案名取得エラー:", e));
+    // 初期化処理
+    function init() {
+      if (urlOpId) {
+        // QRコードから来た場合は参加画面を表示
+        operationId = urlOpId;
+        setupScreen.classList.add('hidden');
+        joinScreen.classList.remove('hidden');
       }
     }
 
-    // ホスト: 新規セッション開始
-    btnCreateSession.addEventListener('click', async () => {
-      userName = document.getElementById('host-name-input').value.trim() || "指揮本部";
-      userFullName = "指揮本部管理者"; 
-      userAffiliation = "指揮本部"; 
-      userPhone = "-"; 
-      userRadio = "本部用無線"; // 追加
-      userColor = document.querySelector('input[name="host-color"]:checked')?.value || "red"; // 色の取得
-      
-      const sessionName = document.getElementById('session-name-input').value.trim() || "名称未設定事案";
-      const newSessionId = Math.random().toString(36).substring(2, 8);
-      
+    // 匿名ログイン
+    async function login() {
       try {
-        const baseUrl = window.location.href.split('?')[0];
-        const newUrl = baseUrl + '?s=' + newSessionId;
-        window.history.pushState({path: newUrl}, '', newUrl);
-      } catch (e) {
-        console.warn("URLの書き換えをスキップしました", e);
-      }
-      currentSessionId = newSessionId;
-      
-      try {
-        if (currentUser) {
-          const sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', currentSessionId);
-          await setDoc(sessionRef, {
-            name: sessionName,
-            createdAt: Date.now(),
-            hostId: currentUser.uid
-          });
-        }
+        const userCredential = await signInAnonymously(auth);
+        currentUser = userCredential.user;
+        return currentUser;
       } catch (error) {
-        console.error("セッション作成エラー:", error);
+        alert("ログインに失敗しました: " + error.message);
+        throw error;
       }
-      
-      viewHostInit.classList.add('hidden');
-      startApp();
+    }
+
+    // 本部として開始
+    document.getElementById('btn-start-hq').addEventListener('click', async () => {
+      try {
+        statusBadge.textContent = "準備中...";
+        await login();
+        
+        // 新しいOperation IDを生成 (ランダムな英数字)
+        operationId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        currentRole = 'hq';
+        myName = "本部";
+        
+        // 画面切り替え
+        setupScreen.classList.add('hidden');
+        mapChatScreen.classList.remove('hidden');
+        hqTools.classList.remove('hidden');
+        statusBadge.textContent = "本部運用中";
+        statusBadge.classList.replace('bg-gray-500', 'bg-blue-600');
+        
+        initMap();
+        startListening();
+        
+        // QRコードを表示
+        showQRCode();
+        
+        addChatMessage("システム", `新規オペレーション [${operationId}] を開始しました。`, "system");
+      } catch (e) {
+        console.error(e);
+      }
     });
 
-    // 参加者: セッションに参加
-    btnJoinSession.addEventListener('click', () => {
-      userFullName = document.getElementById('join-fullname-input').value.trim();
-      userAffiliation = document.getElementById('join-affiliation-input').value.trim();
-      userPhone = document.getElementById('join-phone-input').value.trim();
-      userRadio = document.getElementById('join-radio-input')?.value.trim() || ""; // 追加 (任意なので空でもOK)
-      userName = document.getElementById('join-name-input').value.trim();
-      userColor = document.querySelector('input[name="join-color"]:checked')?.value || "blue"; // 色の取得
-      
-      const errEl = document.getElementById('join-error');
-      
-      // 無線は任意なので必須チェックから除外
-      if (!userFullName || !userAffiliation || !userPhone || !userName) {
-        errEl.textContent = "すべての項目(必須)を入力してください。";
-        errEl.classList.remove('hidden');
+    // 現場隊員として参加
+    document.getElementById('btn-join').addEventListener('click', async () => {
+      const nameInput = document.getElementById('input-name').value.trim();
+      if (!nameInput) {
+        alert("氏名またはコールサインを入力してください。");
         return;
       }
       
-      errEl.classList.add('hidden');
-      viewJoin.classList.add('hidden');
-      startApp();
+      try {
+        document.getElementById('btn-join').textContent = "接続中...";
+        await login();
+        
+        currentRole = 'field';
+        myName = nameInput;
+        const phone = document.getElementById('input-phone').value.trim();
+        
+        joinScreen.classList.add('hidden');
+        mapChatScreen.classList.remove('hidden');
+        fieldTools.classList.remove('hidden');
+        statusBadge.textContent = "現場活動中";
+        statusBadge.classList.replace('bg-gray-500', 'bg-green-600');
+        
+        initMap();
+        startListening();
+        startGPS(phone);
+        
+        addChatMessage("システム", `${myName} がネットワークに参加しました。`, "system");
+      } catch (e) {
+        console.error(e);
+        document.getElementById('btn-join').textContent = "現場に合流する";
+      }
     });
 
-    // 4. アプリのメイン処理
-    function startApp() {
-      viewMain.classList.remove('hidden');
-      btnShowQr.classList.remove('hidden');
-      btnLeaveSession.classList.remove('hidden'); 
-      btnShowMembers.classList.remove('hidden'); 
-      btnExportChat.classList.remove('hidden');
-      
-      initMap();
-      startLocationTracking();
-      listenToSessionInfo();
-      listenToLocations();
-      listenToMessages();
-    }
-
-    function listenToSessionInfo() {
-      if (!currentSessionId) return;
-      const sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', currentSessionId);
-      onSnapshot(sessionRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.name) {
-            const nameEl = document.getElementById('header-session-name');
-            nameEl.textContent = data.name;
-            nameEl.classList.remove('hidden');
-          }
-          // 追加: 自分がホスト（本部）かどうかを判定
-          if (currentUser && data.hostId === currentUser.uid) {
-            isHost = true;
-          }
-        }
-      }, (error) => {
-        console.error("事案名受信エラー:", error);
-      });
-    }
-
+    // 地図の初期化 (Leaflet)
     function initMap() {
-      map = L.map('map').setView([36.2048, 138.2529], 5);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-      }).addTo(map);
+      // 初期位置 (日本全体)
+      map = L.map('map').setView([35.6895, 139.6917], 5);
       
-      setTimeout(() => map.invalidateSize(), 500);
+      // 国土地理院地図を使用
+      L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+        attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>"
+      }).addTo(map);
 
-      // 画面サイズ変更時（PCの画面リサイズやスマホの縦横回転）に地図の表示を修正
-      window.addEventListener('resize', () => {
-        if (map) map.invalidateSize();
-      });
-    }
-
-    async function updateMyLocation(lat, lng) {
-      const icon = markerIcons[userColor] || markerIcons.red;
-
-      if (!myMarker) {
-        myMarker = L.marker([lat, lng], {icon: icon}).addTo(map)
-          .bindPopup(`${userName} (あなた)`).openPopup();
-      } else {
-        myMarker.setLatLng([lat, lng]);
-        myMarker.setIcon(icon); // 色変更に対応
-        myMarker.bindPopup(`${userName} (あなた)`);
-      }
-
-      if (isFirstLocation) {
-        map.setView([lat, lng], 16);
-        isFirstLocation = false;
-      }
-
-      if (currentUser && currentSessionId) {
-        try {
-          activeMembers[currentUser.uid] = {
-            userId: currentUser.uid,
-            userName: userName,
-            fullName: userFullName,
-            affiliation: userAffiliation,
-            phoneNumber: userPhone,
-            radio: userRadio, 
-            color: userColor, 
-            isMe: true,
-            isHidden: false // 自分は常に表示
-          };
-
-          const locRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', currentUser.uid);
-          // 既存のデータを上書きして消さないように { merge: true } を追加
-          await setDoc(locRef, {
-            userId: currentUser.uid,
-            userName: userName,
-            fullName: userFullName,       
-            affiliation: userAffiliation, 
-            phoneNumber: userPhone,       
-            radio: userRadio, 
-            color: userColor, 
-            sessionId: currentSessionId,
-            lat: lat,
-            lng: lng,
-            timestamp: Date.now()
-          }, { merge: true });
-        } catch (error) {
-          console.error("位置情報送信エラー:", error);
-        }
+      // 本部の場合は現在地を取得してズーム
+      if (currentRole === 'hq') {
+        navigator.geolocation.getCurrentPosition(pos => {
+          map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+        }, () => {
+          // エラー時はデフォルト位置
+        });
       }
     }
 
-    function startMockLocation() {
-      console.log("モックGPSを開始します...");
-      let mockLat = 34.9539;
-      let mockLng = 137.1622;
-
-      setInterval(() => {
-        mockLat += (Math.random() - 0.5) * 0.0005;
-        mockLng += (Math.random() - 0.5) * 0.0005;
-        updateMyLocation(mockLat, mockLng);
-      }, 3000);
-    }
-
-    function startLocationTracking() {
+    // GPSトラッキング開始 (現場用)
+    function startGPS(phone) {
       if (!navigator.geolocation) {
-        console.warn("お使いの端末は位置情報に対応していません。テスト用データを使用します。");
-        startMockLocation();
+        alert("このブラウザはGPSに対応していません。");
         return;
       }
 
       watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          updateMyLocation(position.coords.latitude, position.coords.longitude);
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          
+          // 初回だけ自分の位置にズーム
+          if (!markers[currentUser.uid]) {
+            map.setView([lat, lng], 16);
+          }
+
+          // Firestoreに位置を保存
+          try {
+            await setDoc(doc(db, "operations", operationId, "locations", currentUser.uid), {
+              name: myName,
+              phone: phone || "",
+              lat: lat,
+              lng: lng,
+              timestamp: serverTimestamp()
+            });
+          } catch (e) {
+            console.error("位置情報の送信エラー", e);
+          }
         },
         (error) => {
-          console.warn("GPS警告:", error.message);
-          const errEl = document.getElementById('join-error');
-          if (errEl) {
-            errEl.textContent = "実際のGPSが取得できませんでした。テスト用の位置情報で開始します。";
-            errEl.classList.remove('hidden');
-          }
-          startMockLocation();
+          console.warn('GPSエラー:', error.message);
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
       );
     }
 
-    function listenToLocations() {
-      const locationsRef = collection(db, 'artifacts', appId, 'public', 'data', 'locations');
-      
+    // データのリアルタイム受信開始
+    function startListening() {
+      // 1. 位置情報のリスナー
+      const locationsRef = collection(db, "operations", operationId, "locations");
       onSnapshot(locationsRef, (snapshot) => {
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.sessionId === currentSessionId && data.userId !== currentUser.uid) {
-            // isHidden (非表示フラグ) も渡すように変更
-            updateOtherMarker(data.userId, data.userName || "不明", data.lat, data.lng, data.color, data.isHidden);
-            activeMembers[data.userId] = data;
+        updateMembersList(snapshot.docs); // 本部用リスト更新
+        
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          const uid = change.doc.id;
+          
+          if (change.type === "added" || change.type === "modified") {
+            // マーカー更新
+            if (markers[uid]) {
+              markers[uid].setLatLng([data.lat, data.lng]);
+            } else {
+              // 新規マーカー作成
+              const iconColor = uid === currentUser.uid ? 'green' : 'blue';
+              const markerHtml = `
+                <div style="background-color: ${iconColor}; color: white; padding: 2px 5px; border-radius: 5px; font-size: 10px; white-space: nowrap; border: 1px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.5);">
+                  ${data.name}
+                </div>
+              `;
+              const customIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: markerHtml,
+                iconSize: [0, 0],
+                iconAnchor: [15, 25] // ピンの先端を合わせる
+              });
+              
+              markers[uid] = L.marker([data.lat, data.lng], {icon: customIcon}).addTo(map);
+            }
+          }
+          if (change.type === "removed") {
+            if (markers[uid]) {
+              map.removeLayer(markers[uid]);
+              delete markers[uid];
+            }
           }
         });
-      }, (error) => {
-        console.error("位置情報受信エラー:", error);
+      });
+
+      // 2. チャットのリスナー
+      const chatRef = collection(db, "operations", operationId, "chat");
+      const chatQuery = query(chatRef, orderBy("timestamp", "asc"));
+      
+      onSnapshot(chatQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const data = change.doc.data();
+            const type = data.senderId === currentUser.uid ? 'me' : (data.senderId === 'system' ? 'system' : 'other');
+            addChatMessage(data.senderName, data.text, type);
+          }
+        });
       });
     }
 
-    function updateOtherMarker(userId, otherUserName, lat, lng, color, isHidden) {
-      // 追加: 本部によって非表示に設定されている場合
-      if (isHidden) {
-        if (otherMarkers[userId] && map.hasLayer(otherMarkers[userId])) {
-          map.removeLayer(otherMarkers[userId]); // 地図上からピンを隠す
-        }
-        return;
+    // チャット送信処理
+    async function sendChat() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      
+      chatInput.value = ""; // クリア
+      
+      try {
+        await addDoc(collection(db, "operations", operationId, "chat"), {
+          senderId: currentUser.uid,
+          senderName: myName,
+          text: text,
+          timestamp: serverTimestamp()
+        });
+      } catch (e) {
+        console.error("チャット送信エラー", e);
+        alert("送信に失敗しました");
       }
+    }
+    document.getElementById('btn-send-chat').addEventListener('click', sendChat);
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendChat();
+    });
 
-      const icon = markerIcons[color] || markerIcons.blue;
-
-      if (!otherMarkers[userId]) {
-        otherMarkers[userId] = L.marker([lat, lng], {icon: icon}).addTo(map)
-          .bindPopup(otherUserName);
+    // チャットUIへの描画
+    function addChatMessage(name, text, type) {
+      const div = document.createElement('div');
+      
+      if (type === 'system') {
+        div.className = "text-center text-xs text-gray-500 my-1";
+        div.textContent = text;
+      } else if (type === 'me') {
+        div.className = "flex flex-col items-end";
+        div.innerHTML = `
+          <span class="text-[10px] text-gray-500">${name}</span>
+          <div class="bg-blue-500 text-white p-2 rounded-lg rounded-tr-none max-w-[80%] text-sm shadow">${text}</div>
+        `;
       } else {
-        // 非表示から再度表示に戻った場合の対応
-        if (!map.hasLayer(otherMarkers[userId])) {
-          otherMarkers[userId].addTo(map);
-        }
-        otherMarkers[userId].setLatLng([lat, lng]);
-        otherMarkers[userId].setIcon(icon); 
-        otherMarkers[userId].bindPopup(otherUserName);
+        div.className = "flex flex-col items-start";
+        div.innerHTML = `
+          <span class="text-[10px] text-gray-500">${name}</span>
+          <div class="bg-gray-200 text-gray-800 p-2 rounded-lg rounded-tl-none max-w-[80%] text-sm shadow">${text}</div>
+        `;
       }
+      
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight; // 一番下へスクロール
     }
 
-    // 7. チャット機能
-    function listenToMessages() {
-      const msgsRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+    // 隊員一覧の更新 (本部のみ)
+    function updateMembersList(docs) {
+      if (currentRole !== 'hq') return;
+      const listDiv = document.getElementById('members-list');
+      listDiv.innerHTML = '';
       
-      onSnapshot(msgsRef, (snapshot) => {
-        let messages = [];
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.sessionId === currentSessionId) {
-            messages.push({ id: doc.id, ...data });
-          }
-        });
-        
-        messages.sort((a, b) => a.timestamp - b.timestamp);
-        currentMessages = messages;
-        renderMessages(messages);
-      }, (error) => {
-        console.error("チャット受信エラー:", error);
-      });
-    }
-
-    function renderMessages(messages) {
-      chatMessages.innerHTML = '<div class="text-center text-xs text-gray-400 my-2">通信を開始しました</div>';
-      
-      messages.forEach(msg => {
-        const isMe = msg.userId === currentUser.uid;
-        const displayName = isMe ? `${msg.userName || 'あなた'} (自分)` : (msg.userName || `隊員:${msg.userId.substring(0, 4)}`);
-        const align = isMe ? "justify-end" : "justify-start";
-        const bgColor = isMe ? "bg-blue-500 text-white" : "bg-white border border-gray-200 text-gray-800";
-        const borderRadius = isMe ? "rounded-l-lg rounded-tr-lg" : "rounded-r-lg rounded-tl-lg";
-        const maxWidth = "max-w-[85%]";
-        
-        const d = new Date(msg.timestamp);
-        const timeStr = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-        
-        // テキストの処理
-        const formattedText = msg.text ? msg.text.replace(/\n/g, '<br>') : '';
-        
-        // 画像の処理 (追加)
-        const imgHtml = msg.imageUrl ? `<img src="${msg.imageUrl}" class="mt-2 rounded max-w-full max-h-48 object-cover cursor-pointer chat-image border ${isMe ? 'border-blue-400' : 'border-gray-300'}" alt="添付画像">` : '';
-
-        const msgHtml = `
-          <div class="flex ${align} w-full mb-2">
-            <div class="${maxWidth} flex flex-col ${isMe ? 'items-end' : 'items-start'}">
-              <span class="text-[10px] text-gray-500 mb-1 px-1">${displayName}</span>
-              <div class="${bgColor} px-3 py-2 ${borderRadius} shadow-sm text-sm break-words">
-                ${formattedText}
-                ${imgHtml}
-              </div>
-              <span class="text-[9px] text-gray-400 mt-1 px-1">${timeStr}</span>
-            </div>
+      docs.forEach(docSnap => {
+        const data = docSnap.data();
+        const item = document.createElement('div');
+        item.className = "p-2 border border-gray-200 rounded flex justify-between items-center bg-gray-50";
+        item.innerHTML = `
+          <div>
+            <div class="font-bold text-gray-800">${data.name}</div>
+            <div class="text-xs text-gray-500">${data.phone || '電話番号なし'}</div>
           </div>
         `;
-        chatMessages.insertAdjacentHTML('beforeend', msgHtml);
+        listDiv.appendChild(item);
       });
+    }
+
+    // === UI制御関連 ===
+    
+    // QRコード表示 (本部)
+    function showQRCode() {
+      const modal = document.getElementById('modal-qr');
+      const container = document.getElementById('qrcode-container');
+      const urlDisplay = document.getElementById('share-url');
       
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    // メッセージと画像の送信処理 (統合)
-    async function sendChatData(text, imageUrl = null) {
-      if (!text && !imageUrl) return; // 空なら送らない
-      if (!currentUser || !currentSessionId) return;
+      container.innerHTML = ""; // クリア
       
-      try {
-        const msgsRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
-        await addDoc(msgsRef, {
-          userId: currentUser.uid,
-          userName: userName,
-          sessionId: currentSessionId,
-          text: text,
-          imageUrl: imageUrl, // 追加: 画像データ(Base64)
-          timestamp: Date.now()
-        });
-      } catch (error) {
-        console.error("メッセージ送信エラー:", error);
-      }
-    }
-
-    // テキストのみ送信
-    async function sendChatMessage() {
-      const text = chatInput.value.trim();
-      chatInput.value = ""; 
-      sendChatData(text, null);
-    }
-
-    // --- 写真添付機能 ---
-    btnAttachImg.addEventListener('click', () => {
-      chatImageInput.click();
-    });
-
-    chatImageInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      // UX向上: 処理中であることをユーザーに知らせる
-      const originalPlaceholder = chatInput.placeholder;
-      chatInput.placeholder = "画像を圧縮・送信中...";
-      chatInput.disabled = true;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          // 現場の通信負荷を減らすため、画像をリサイズ (長辺最大800px)
-          const canvas = document.createElement('canvas');
-          let w = img.width;
-          let h = img.height;
-          const MAX_SIZE = 800;
-
-          if (w > h && w > MAX_SIZE) {
-            h *= MAX_SIZE / w;
-            w = MAX_SIZE;
-          } else if (h > MAX_SIZE) {
-            w *= MAX_SIZE / h;
-            h = MAX_SIZE;
-          }
-
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-
-          // JPEG形式で適度に圧縮して文字列(Base64)に変換
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
-          // 一緒に入力されているテキストがあれば取得してクリア
-          const text = chatInput.value.trim();
-          chatInput.value = "";
-          
-          chatInput.placeholder = originalPlaceholder;
-          chatInput.disabled = false;
-          chatImageInput.value = ""; // 選択状態をリセット
-
-          sendChatData(text, dataUrl);
-        };
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // 画像クリックで拡大表示 (イベント委譲)
-    chatMessages.addEventListener('click', (e) => {
-      if (e.target.classList.contains('chat-image')) {
-        modalImageContent.src = e.target.src;
-        modalImage.classList.remove('hidden');
-      }
-    });
-
-    btnCloseImage.addEventListener('click', () => {
-      modalImage.classList.add('hidden');
-    });
-
-    btnSendMsg.addEventListener('click', sendChatMessage);
-    chatInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendChatMessage();
-    });
-
-    // 8. QRコード表示処理
-    btnShowQr.addEventListener('click', () => {
+      // 現在のURLにパラメータをつけてQRコード化
       const baseUrl = window.location.href.split('?')[0];
-      const url = baseUrl + '?s=' + currentSessionId;
-      document.getElementById('share-url').textContent = url;
-      document.getElementById('qrcode').innerHTML = "";
-      new QRCode(document.getElementById('qrcode'), {
-        text: url,
+      const joinUrl = `${baseUrl}?op=${operationId}`;
+      
+      new QRCode(container, {
+        text: joinUrl,
         width: 150,
-        height: 150,
-        colorDark : "#000000",
-        colorLight : "#ffffff",
-        correctLevel : QRCode.CorrectLevel.H
+        height: 150
       });
-      modalQr.classList.remove('hidden');
-    });
+      
+      urlDisplay.textContent = joinUrl;
+      modal.classList.remove('hidden');
+    }
 
+    document.getElementById('btn-show-qr').addEventListener('click', showQRCode);
     document.getElementById('btn-close-qr').addEventListener('click', () => {
-      modalQr.classList.add('hidden');
+      document.getElementById('modal-qr').classList.add('hidden');
     });
 
-    // --- 隊員一覧表示機能 ---
-    btnShowMembers.addEventListener('click', () => {
-      membersTableBody.innerHTML = '';
-      
-      const hexColors = { red: '#ef4444', blue: '#3b82f6', green: '#22c55e', orange: '#f97316', violet: '#a855f7', grey: '#6b7280' };
-
-      Object.values(activeMembers).forEach(member => {
-        const tr = document.createElement('tr');
-        if (member.isMe) tr.classList.add('bg-blue-50');
-        
-        const phoneHtml = (member.phoneNumber && member.phoneNumber !== '-') 
-          ? `<a href="tel:${member.phoneNumber}" class="text-blue-600 underline">${member.phoneNumber}</a>` 
-          : '-';
-
-        const dotColor = hexColors[member.color] || hexColors.blue;
-        const colorDotHtml = `<span class="inline-block w-3 h-3 rounded-full mr-1 align-middle" style="background-color: ${dotColor};"></span>`;
-
-        // 追加: 本部権限による表示/非表示ボタンの生成
-        let visibilityHtml = '';
-        if (member.isMe) {
-          visibilityHtml = '<span class="text-xs text-gray-400 font-semibold">-</span>';
-        } else if (isHost) {
-          const isHidden = member.isHidden || false;
-          const btnClass = isHidden ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-green-500 text-white hover:bg-green-600';
-          const btnText = isHidden ? '非表示' : '表示中';
-          visibilityHtml = `<button data-userid="${member.userId}" data-hidden="${isHidden}" class="toggle-visibility-btn px-3 py-1 rounded shadow-sm text-[11px] font-bold transition ${btnClass}">${btnText}</button>`;
-        } else {
-          // 一般隊員の画面では、現在のステータスだけ見える（操作不可）
-          visibilityHtml = member.isHidden ? '<span class="text-xs text-gray-400 font-semibold">非表示</span>' : '<span class="text-xs text-green-600 font-semibold">表示中</span>';
-        }
-
-        tr.innerHTML = `
-          <td class="px-4 py-2">${colorDotHtml}${member.userName || '-'}${member.isMe ? ' <span class="text-xs text-blue-500">(あなた)</span>' : ''}</td>
-          <td class="px-4 py-2">${member.fullName || '-'}</td>
-          <td class="px-4 py-2">${member.affiliation || '-'}</td>
-          <td class="px-4 py-2">${phoneHtml}</td>
-          <td class="px-4 py-2">${member.radio || '-'}</td>
-          <td class="px-4 py-2 text-center">${visibilityHtml}</td>
-        `;
-        membersTableBody.appendChild(tr);
-      });
-      
-      modalMembers.classList.remove('hidden');
+    // 隊員一覧の開閉 (本部)
+    const membersPanel = document.getElementById('members-panel');
+    document.getElementById('btn-toggle-members').addEventListener('click', () => {
+      membersPanel.classList.toggle('translate-x-full');
+    });
+    document.getElementById('btn-close-members').addEventListener('click', () => {
+      membersPanel.classList.add('translate-x-full');
     });
 
-    // 追加: 表示/非表示ボタンを押した時の処理
-    membersTableBody.addEventListener('click', async (e) => {
-      if (e.target.classList.contains('toggle-visibility-btn')) {
-        const userId = e.target.getAttribute('data-userid');
-        const currentHidden = e.target.getAttribute('data-hidden') === 'true';
-        
-        e.target.disabled = true;
-        e.target.textContent = '更新中...';
-        
-        try {
-          const locRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', userId);
-          // データベースの isHidden フラグを反転させる
-          await updateDoc(locRef, {
-            isHidden: !currentHidden
-          });
-          
-          activeMembers[userId].isHidden = !currentHidden;
-          btnShowMembers.click(); // 一覧画面を再描画
-        } catch (error) {
-          console.error("表示状態の変更エラー:", error);
-          e.target.disabled = false;
-          e.target.textContent = currentHidden ? '非表示' : '表示中';
-        }
+    // 現在地に戻る (現場)
+    document.getElementById('btn-my-location').addEventListener('click', () => {
+      if (markers[currentUser.uid]) {
+        map.setView(markers[currentUser.uid].getLatLng(), 16);
       }
     });
 
-    btnCloseMembers.addEventListener('click', () => {
-      modalMembers.classList.add('hidden');
-    });
-
-    // --- 退出処理機能 ---
-    btnLeaveSession.addEventListener('click', () => {
+    // 退出処理 (現場)
+    const modalLeave = document.getElementById('modal-leave');
+    document.getElementById('btn-leave').addEventListener('click', () => {
       modalLeave.classList.remove('hidden');
     });
-
-    btnCancelLeave.addEventListener('click', () => {
+    document.getElementById('btn-cancel-leave').addEventListener('click', () => {
       modalLeave.classList.add('hidden');
     });
-
-    btnConfirmLeave.addEventListener('click', async () => {
-      modalLeave.classList.add('hidden');
-      
-      // ボタンを一時的に無効化
-      btnLeaveSession.disabled = true;
-      btnLeaveSession.textContent = '退出中...';
-
-      if (currentUser && currentSessionId) {
-        try {
-          // データベースから自分の位置情報を完全に削除
-          const locRef = doc(db, 'artifacts', appId, 'public', 'data', 'locations', currentUser.uid);
-          await deleteDoc(locRef);
-          
-          // GPSの追跡を強制停止
-          if (watchId) {
-            navigator.geolocation.clearWatch(watchId);
-          }
-        } catch (error) {
-          console.error("退出処理エラー:", error);
-        } finally {
-          // パラメータ(事案ID)を消して最初の画面にリダイレクト
-          const baseUrl = window.location.href.split('?')[0];
-          window.location.href = baseUrl;
-        }
-      }
-    });
-
-    // --- チャット履歴コピー機能 ---
-    btnExportChat.addEventListener('click', () => {
-      if (!currentSessionId) return;
-      
-      // 全チャットログから時間を付けてテキスト化
-      const chatLog = currentMessages.map(m => {
-        const d = new Date(m.timestamp);
-        const timeStr = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-        // メッセージ内の改行を反映
-        const text = m.text.replace(/\n/g, '\n      ');
-        return `[${timeStr}] ${m.userName}:\n      ${text}`;
-      }).join('\n\n');
-
-      exportContent.textContent = chatLog || '（通信記録なし）';
-      modalExportChat.classList.remove('hidden');
-    });
-
-    btnCloseExport.addEventListener('click', () => {
-      modalExportChat.classList.add('hidden');
-    });
-
-    btnCopyExport.addEventListener('click', () => {
-      const textToCopy = exportContent.textContent;
-      const textArea = document.createElement("textarea");
-      textArea.value = textToCopy;
-      document.body.appendChild(textArea);
-      textArea.select();
+    document.getElementById('btn-confirm-leave').addEventListener('click', async () => {
+      // 1. GPSトラッキング停止
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      // 2. データベースから自分の位置を削除
       try {
-        document.execCommand('copy');
-        const originalText = btnCopyExport.textContent;
-        btnCopyExport.textContent = "✅ コピーしました！";
-        setTimeout(() => btnCopyExport.textContent = originalText, 2000);
-      } catch (err) {
-        console.error('Copy failed', err);
+        await deleteDoc(doc(db, "operations", operationId, "locations", currentUser.uid));
+        // 3. チャットに退出メッセージを残す
+        await addDoc(collection(db, "operations", operationId, "chat"), {
+          senderId: 'system',
+          senderName: 'システム',
+          text: `${myName} が退出しました。`,
+          timestamp: serverTimestamp()
+        });
+      } catch (e) {
+        console.error("退出エラー", e);
       }
-      document.body.removeChild(textArea);
+      // 4. 画面をリロードして初期状態に戻す
+      window.location.href = window.location.href.split('?')[0];
     });
 
-    // アプリ起動
-    initAuth();
+    // 初期化実行
+    init();
 
   </script>
 </body>
