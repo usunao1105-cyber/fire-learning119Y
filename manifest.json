@@ -1,0 +1,34 @@
+const CACHE_NAME = 'rescue-map-cache-v1';
+const urlsToCache = [
+  './',
+  './index.html',
+  './manifest.json'
+  // もしアイコン画像(icon-192.png等)をアップロード済みなら、以下も追加するとより確実です
+  // './icon-192.png',
+  // './icon-512.png'
+];
+
+// インストール処理
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Opened cache');
+        return cache.addAll(urlsToCache);
+      })
+  );
+});
+
+// リソースの取得（キャッシュがあればそれを返す）
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        // キャッシュ内に該当するレスポンスがあればそれを返す
+        if (response) {
+          return response;
+        }
+        return fetch(event.request);
+      })
+  );
+});
