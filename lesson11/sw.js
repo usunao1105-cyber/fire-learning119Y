@@ -1,29 +1,50 @@
-// Service Worker (キャッシュとオフライン動作を管理するファイル)
-const CACHE_NAME = 'ccf-calculator-v1';
+const CACHE_NAME = 'rescue-map-cache-v3'; // 名前を更新
 const urlsToCache = [
   './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
-// インストール時にファイルをキャッシュ
+// インストール処理
 self.addEventListener('install', event => {
+  self.skipWaiting(); // 新しいService Workerをすぐにアクティブにする
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        console.log('キャッシュを開きました');
+        // エラーが起きてもインストールを止めないように個別に追加する
+        return Promise.allSettled(
+          urlsToCache.map(url => cache.add(url).catch(err => console.log('キャッシュ失敗(無視します):', url)))
+        );
       })
   );
 });
 
-// ネットワークリクエストの処理（オフライン時はキャッシュを返す）
+// アクティベート処理（古いキャッシュの削除）
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('古いキャッシュを削除しました:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+});
+
+// リソースの取得（ネットワーク通信を優先し、オフラインの時だけキャッシュを返す）
 self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return; // POSTリクエストはキャッシュしない
+
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // キャッシュがあればそれを返し、なければネットワークから取得
-        return response || fetch(event.request);
-      })
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
+    })
   );
 });
