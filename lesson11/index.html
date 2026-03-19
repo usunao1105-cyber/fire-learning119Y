@@ -537,16 +537,42 @@
               };
               const pinBgColor = colorCodeMap[data.color] || '#3b82f6';
 
+              // ★変更：マーカーを大きくし、白背景＋カラー太字の吹き出しデザインにして視認性を向上
               const markerHtml = `
-                <div style="background-color: ${pinBgColor}; color: white; padding: 2px 5px; border-radius: 5px; font-size: 10px; white-space: nowrap; border: 1px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.5);">
+                <div style="
+                  position: absolute;
+                  bottom: 0;
+                  left: 50%;
+                  transform: translate(-50%, 0);
+                  background-color: white;
+                  color: ${pinBgColor};
+                  padding: 4px 12px;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  font-weight: 900;
+                  white-space: nowrap;
+                  border: 3px solid ${pinBgColor};
+                  box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+                ">
                   ${data.shortName || data.name}
+                  <div style="
+                    position: absolute;
+                    bottom: -8px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 0;
+                    height: 0;
+                    border-left: 8px solid transparent;
+                    border-right: 8px solid transparent;
+                    border-top: 8px solid ${pinBgColor};
+                  "></div>
                 </div>
               `;
               const customIcon = L.divIcon({
                 className: 'custom-div-icon',
                 html: markerHtml,
                 iconSize: [0, 0],
-                iconAnchor: [15, 25] 
+                iconAnchor: [0, 8] 
               });
               
               markers[uid] = L.marker([data.lat, data.lng], {icon: customIcon}).addTo(map);
