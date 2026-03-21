@@ -52,61 +52,25 @@
 
         // --- 初期データ構造 ---
         const INITIAL_DATA = {
-            incidentNumber: '',
-            directive: '',
-            teamName: '',
-            recorderName: '',
-            occurrenceDate: '',
-            occurrenceTime: '',
-            awarenessDate: '',
-            awarenessTime: '',
-            dispatchLocation: '',
-            arrivalAtSceneTime: '',
-            contactTime: '',
-            accommodationTime: '',
-            departureFromSceneTime: '',
-            arrivalAtHospitalTime: '',
+            incidentNumber: '', directive: '', teamName: '', recorderName: '',
+            occurrenceDate: '', occurrenceTime: '', awarenessDate: '', awarenessTime: '',
+            dispatchLocation: '', arrivalAtSceneTime: '', contactTime: '', accommodationTime: '',
+            departureFromSceneTime: '', arrivalAtHospitalTime: '',
             
-            patientName: '',
-            gender: '',
-            age: '',
-            address: '',
-            phone: '',
-            birthEra: 'R',
-            birthYear: '',
-            birthMonth: '',
-            birthDay: '',
+            patientName: '', gender: '', age: '', address: '', phone: '',
+            birthEra: 'R', birthYear: '', birthMonth: '', birthDay: '',
+            occurrenceLocation: '', accidentCause: '', occurrenceType: '', chiefComplaint: '',
             
-            occurrenceLocation: '',
-            accidentCause: '',
-            occurrenceType: '',
-            chiefComplaint: '',
-            
-            verbalInstruction: '無',
-            verbalInstructionTime: '',
-            witnessedArrest: '無',
-            witnessedBy: '',
-            witnessedTime: '',
-            arrestCause: '',
-            bystanderCpr: '無',
-            bystanderCprBy: '',
-            bystanderCprTime: '',
-            initialEcg: '',
-            initialEcgTime: '',
-            initialEcgLocation: '',
-            initialEcgEval: '',
+            verbalInstruction: '無', verbalInstructionTime: '', witnessedArrest: '無', witnessedBy: '', witnessedTime: '', arrestCause: '',
+            bystanderCpr: '無', bystanderCprBy: '', bystanderCprTime: '',
+            initialEcg: '', initialEcgTime: '', initialEcgLocation: '', initialEcgEval: '',
             
             observations: [
                 { id: 1, time: '', location: '', consciousness: '', respiration: '', pulse: '', bp: '', ecg: '', spo2: '', doctor: '', treatment: '', notes: '', instructionTime: '', instructionText: '' }
             ],
             
-            passenger: '無',
-            familyContact: '未',
-            patientCardNumber: '',
-            hospitalName: '',
-            doctorName: '',
-            diagnosisName: '',
-            severity: '',
+            passenger: '無', familyContact: '未', patientCardNumber: '',
+            hospitalName: '', doctorName: '', diagnosisName: '', severity: '',
 
             val1TeamComment: '', val1InspectorComment: '', val1Score: '',
             val3TeamComment: '', val3InspectorComment: '', val3Score: '',
@@ -118,34 +82,62 @@
 
         // --- メインアプリケーション ---
         function App() {
-            // 初期データの読み込み（ローカルストレージに保存されていれば自動復元）
+            // 初期データの読み込み（URLのQRパラメータを優先、なければローカルストレージ）
             const [data, setData] = useState(() => {
                 try {
-                    const savedData = localStorage.getItem('ems-record-data');
-                    if (savedData) {
-                        return { ...INITIAL_DATA, ...JSON.parse(savedData) };
+                    const params = new URLSearchParams(window.location.search);
+                    const d = params.get('d');
+                    if (d) {
+                        const encoded = d.replace('EMS:', '');
+                        const jsonString = decodeURIComponent(atob(encoded));
+                        const parsedData = JSON.parse(jsonString);
+                        const restoredData = { ...INITIAL_DATA, ...parsedData };
+                        if (parsedData.observations) {
+                            restoredData.observations = parsedData.observations.map((obs, idx) => ({
+                                ...INITIAL_DATA.observations[0], ...obs, id: Date.now() + idx 
+                            }));
+                        }
+                        return restoredData; // URLから読み込み成功
                     }
+                } catch (e) {
+                    console.error("URLからのデータ復元に失敗しました", e);
+                }
+
+                try {
+                    const savedData = localStorage.getItem('ems-record-data');
+                    if (savedData) return { ...INITIAL_DATA, ...JSON.parse(savedData) };
                 } catch (e) {
                     console.error("ローカルストレージの読み込みに失敗しました", e);
                 }
                 return INITIAL_DATA;
             });
-            const [viewMode, setViewMode] = useState('input');
+
+            // 表示モード（URLから開かれた場合は「文字起こし」をデフォルトにして閲覧しやすくする）
+            const [viewMode, setViewMode] = useState(() => {
+                const params = new URLSearchParams(window.location.search);
+                return params.get('d') ? 'text' : 'input';
+            });
+
+            // URLからデータを読み込んだ場合、URLバーをきれいに（クリーンアップ）する
+            useEffect(() => {
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('d')) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }, []);
 
             // データが変更されるたびに自動保存
             useEffect(() => {
                 localStorage.setItem('ems-record-data', JSON.stringify(data));
             }, [data]);
 
-            // Cmd+P / Ctrl+P で印刷プレビュー＆印刷ダイアログを開くショートカット
+            // Cmd+P / Ctrl+P で印刷プレビュー＆印刷ダイアログを開く
             useEffect(() => {
                 const handleKeyDown = (e) => {
                     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
                         e.preventDefault();
-                        setViewMode('preview'); // プレビュー画面に切り替え
-                        setTimeout(() => {
-                            window.print(); // 画面の切り替えを待ってから印刷画面を開く
-                        }, 500); 
+                        setViewMode('preview'); 
+                        setTimeout(() => { window.print(); }, 500); 
                     }
                 };
                 window.addEventListener('keydown', handleKeyDown);
@@ -154,39 +146,33 @@
 
             const handleChange = (e) => {
                 const { name, value, type, checked } = e.target;
-                setData(prev => ({
-                ...prev,
-                [name]: type === 'checkbox' ? checked : value
-                }));
+                setData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
             };
 
             const handleObservationChange = (id, field, value) => {
                 setData(prev => ({
-                ...prev,
-                observations: prev.observations.map(obs => 
-                    obs.id === id ? { ...obs, [field]: value } : obs
-                )
+                    ...prev,
+                    observations: prev.observations.map(obs => obs.id === id ? { ...obs, [field]: value } : obs)
                 }));
             };
 
             const addObservation = () => {
                 setData(prev => ({
-                ...prev,
-                observations: [...prev.observations, { 
-                    id: Date.now(), time: '', location: '', consciousness: '', respiration: '', pulse: '', bp: '', ecg: '', spo2: '', doctor: '', treatment: '', notes: '', instructionTime: '', instructionText: '' 
-                }]
+                    ...prev,
+                    observations: [...prev.observations, { 
+                        id: Date.now(), time: '', location: '', consciousness: '', respiration: '', pulse: '', bp: '', ecg: '', spo2: '', doctor: '', treatment: '', notes: '', instructionTime: '', instructionText: '' 
+                    }]
                 }));
             };
 
             const removeObservation = (id) => {
                 if (data.observations.length <= 1) return;
                 setData(prev => ({
-                ...prev,
-                observations: prev.observations.filter(obs => obs.id !== id)
+                    ...prev,
+                    observations: prev.observations.filter(obs => obs.id !== id)
                 }));
             };
 
-            // データをリセットする関数
             const handleReset = () => {
                 if (window.confirm('入力内容をすべて消去して、新しい事案を作成しますか？\n（※一度消去すると復元できません）')) {
                     setData(INITIAL_DATA);
@@ -196,9 +182,7 @@
                 }
             };
 
-            const handlePrint = () => {
-                window.print();
-            };
+            const handlePrint = () => window.print();
 
             return (
                 <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
@@ -211,15 +195,6 @@
                     <div className="flex gap-2 items-center">
                     <button onClick={handleReset} className="flex items-center gap-1 px-3 py-2 rounded text-sm bg-red-600 hover:bg-red-500 text-white font-bold mr-2 shadow transition-colors" title="現在のデータを消去して新しく始める">
                         <Trash2 size={16} /> 新規事案
-                    </button>
-                    <button onClick={() => setViewMode('input')} className={`flex items-center gap-1 px-3 py-2 rounded text-sm ${viewMode === 'input' ? 'bg-white text-blue-800 font-bold' : 'bg-blue-700 hover:bg-blue-600'}`}>
-                        <Edit size={16} /> 入力
-                    </button>
-                    <button onClick={() => setViewMode('preview')} className={`flex items-center gap-1 px-3 py-2 rounded text-sm ${viewMode === 'preview' ? 'bg-white text-blue-800 font-bold' : 'bg-blue-700 hover:bg-blue-600'}`}>
-                        <FileText size={16} /> プレビュー
-                    </button>
-                    <button onClick={() => setViewMode('text')} className={`flex items-center gap-1 px-3 py-2 rounded text-sm ${viewMode === 'text' ? 'bg-white text-blue-800 font-bold' : 'bg-blue-700 hover:bg-blue-600'}`}>
-                        <ClipboardList size={16} /> 文字起こし
                     </button>
                     </div>
                 </header>
@@ -236,20 +211,21 @@
                         <ClipboardList size={16} /> 文字起こし
                     </button>
                     <button onClick={() => setViewMode('share')} className={`flex items-center gap-1 px-4 py-2 rounded transition-colors ${viewMode === 'share' ? 'bg-green-600 text-white font-bold' : 'bg-white text-green-700 hover:bg-green-50 border border-green-300'}`}>
-                        <Share2 size={16} /> データ連携 (引継ぎ)
+                        <Share2 size={16} /> データ連携 (引継・共有)
                     </button>
                     </div>
 
                     {viewMode === 'input' && <InputForm data={data} handleChange={handleChange} handleObservationChange={handleObservationChange} addObservation={addObservation} removeObservation={removeObservation} />}
+                    
                     {viewMode === 'preview' && (
                     <div className="flex flex-col items-center">
-                        <div className="mb-4 no-print w-full flex flex-col items-end max-w-[210mm] bg-yellow-50 p-4 border border-yellow-200 rounded text-sm text-gray-700">
+                        <div className="mb-4 no-print w-full flex flex-col items-end max-w-[210mm] bg-yellow-50 p-4 border border-yellow-200 rounded text-sm text-gray-700 shadow-sm">
                         <div className="mb-3 w-full text-left font-bold text-yellow-800">
                             💡 印刷・PDF保存について
                         </div>
                         <ul className="list-disc pl-5 mb-4 w-full text-left space-y-1">
                             <li>PDFとして保存する場合は、開いた印刷画面のプリンター（送信先）を<strong>「PDFに保存」</strong>に変更してください。</li>
-                            <li>キーボードの <strong>「Command + P」</strong>(Mac) または <strong>「Ctrl + P」</strong>(Windows) を押すことでも、このプレビューと印刷画面を一発で呼び出せます。</li>
+                            <li>キーボードの <strong>「Command + P」</strong>(Mac) または <strong>「Ctrl + P」</strong>(Windows) を押すことでも呼び出せます。</li>
                         </ul>
                         <button onClick={handlePrint} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded shadow font-bold">
                             <Printer size={20} /> 印刷 / PDF保存画面を開く
@@ -258,6 +234,7 @@
                         <PrintPreview data={data} />
                     </div>
                     )}
+                    
                     {viewMode === 'text' && <TextExport data={data} />}
                     {viewMode === 'share' && <ShareExportImport data={data} setData={setData} />}
                 </main>
@@ -530,7 +507,7 @@
             );
         }
 
-        // --- プレビュー (印刷) コンポーネント ---
+        // --- プレビュー (印刷) コンポーネント (本物レイアウト完全再現) ---
         function PrintPreview({ data }) {
             const splitDate = (dateStr) => {
                 if (!dateStr) return { year: '　　', month: '　', day: '　' };
@@ -550,19 +527,20 @@
             const hStr = (time) => time ? splitTime(time).h : '　';
             const mStr = (time) => time ? splitTime(time).m : '　';
 
-            const Checkbox = ({ checked, label }) => (
+            // 四角いチェックボックス
+            const PdfCheck = ({ checked, label }) => (
                 <span className="inline-flex items-center mr-3">
-                <span className="border border-black w-[12px] h-[12px] inline-block relative mr-1 bg-white">
-                    {checked && <span className="absolute -top-[4px] -left-[1px] text-[14px] leading-none font-sans">✔</span>}
-                </span>
-                {label}
+                    <span className="inline-flex items-center justify-center w-3 h-3 border border-black mr-1 bg-white text-[12px] font-sans leading-none pt-[1px]">
+                        {checked ? '✔' : ''}
+                    </span>
+                    <span>{label}</span>
                 </span>
             );
 
-            const CircleText = ({ text, active }) => (
-                <span className={`relative inline-block px-1 ${active ? 'z-10' : ''}`}>
-                {text}
-                {active && <span className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[1.5em] h-[1.5em] border border-black rounded-full pointer-events-none"></span>}
+            // テキストを丸で囲む
+            const PdfCircle = ({ checked, label }) => (
+                <span className={`relative inline-flex items-center justify-center px-0.5 mx-0.5 leading-none ${checked ? 'border border-black rounded-full' : ''}`}>
+                    {label}
                 </span>
             );
 
@@ -585,236 +563,332 @@
                 <div id="print-area" className="w-full">
                 <style>{`
                     @media print {
-                    @page { margin: 10mm; size: A4 portrait; }
-                    body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    body * { visibility: hidden; }
-                    #print-area, #print-area * { visibility: visible; }
-                    #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; font-family: "MS Mincho", "Hiragino Mincho ProN", serif; }
-                    .no-print { display: none !important; }
-                    .print-page { page-break-after: always; height: 277mm; position: relative; }
-                    .print-page:last-child { page-break-after: auto; }
+                        @page { margin: 10mm; size: A4 portrait; }
+                        body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        body * { visibility: hidden; }
+                        #print-area, #print-area * { visibility: visible; }
+                        #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; font-family: "MS Mincho", "Hiragino Mincho ProN", serif; }
+                        .no-print { display: none !important; }
+                        .print-page { page-break-after: always; height: 277mm; position: relative; }
+                        .print-page:last-child { page-break-after: auto; }
                     }
-                    .print-page { background: white; color: black; padding: 2rem; margin: 0 auto 2rem auto; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-width: 210mm; font-size: 12px; line-height: 1.25; font-family: "MS Mincho", "Hiragino Mincho ProN", serif; box-sizing: border-box;}
+                    .print-page { background: white; color: black; padding: 2rem; margin: 0 auto 2rem auto; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-width: 210mm; font-size: 11px; line-height: 1.25; font-family: "MS Mincho", "Hiragino Mincho ProN", serif; box-sizing: border-box;}
                     @media print { .print-page { padding: 0; margin: 0; box-shadow: none; max-width: 100%; } }
-                    .print-wrap { border: 2px solid #000; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
-                    .p-row { display: flex; border-bottom: 1px solid #000; min-height: 32px; box-sizing: border-box; width: 100%; }
-                    .p-row:last-child { border-bottom: none; }
-                    .p-row-inner { display: flex; border-bottom: 1px solid #000; min-height: 32px; box-sizing: border-box; width: 100%; }
-                    .p-row-inner:last-child { border-bottom: none; }
-                    .p-col { border-right: 1px solid #000; padding: 2px 4px; display: flex; align-items: center; box-sizing: border-box; }
-                    .p-col:last-child { border-right: none; }
-                    .p-label { justify-content: center; text-align: center; }
-                    .writing-vertical { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.3em; }
+                    
+                    /* 完璧な罫線グリッドを構築するための専用クラス */
+                    .pf-wrap { border: 2px solid #000; width: 100%; display: flex; flex-direction: column; box-sizing: border-box; }
+                    .pf-r { display: flex; width: 100%; border-bottom: 1px solid #000; box-sizing: border-box; min-height: 26px; }
+                    .pf-r:last-child { border-bottom: none; }
+                    .pf-c { border-right: 1px solid #000; display: flex; align-items: center; padding: 2px 4px; box-sizing: border-box; }
+                    .pf-c:last-child { border-right: none; }
+                    .pf-lbl { justify-content: center; text-align: center; }
+                    .pf-v { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.2em; display: flex; align-items: center; justify-content: center; text-align: center; }
                 `}</style>
 
                 <div className="print-page">
-                    <div className="text-center text-xl font-bold mb-4 tracking-widest font-sans">救急隊活動記録票</div>
-                    <div className="print-wrap">
-                    <div className="p-row">
-                        <div className="p-col p-label w-[12%]">発症日時</div><div className="p-col w-[38%]">西暦 {oDate.year}年 {oDate.month}月 {oDate.day}日 {oTime.h}時 {oTime.m}分</div>
-                        <div className="p-col p-label w-[12%]">救急隊名</div><div className="p-col w-[38%] font-sans font-bold">{data.teamName}</div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[12%]">覚知日時</div><div className="p-col w-[22%]">{aDate.month}月 {aDate.day}日 {aTime.h}時 {aTime.m}分</div>
-                        <div className="p-col p-label w-[12%]">事案番号</div><div className="p-col w-[14%] font-sans font-bold">{data.incidentNumber}</div>
-                        <div className="p-col p-label w-[8%]">指令</div><div className="p-col w-[10%]">{data.directive}</div>
-                        <div className="p-col p-label w-[10%] text-[11px]">記載者名</div><div className="p-col w-[12%]">{data.recorderName}</div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[12%]">出場場所</div><div className="p-col w-[88%]">{data.dispatchLocation}</div>
-                    </div>
-                    <div className="p-row font-sans">
-                        <div className="p-col p-label w-[20%]">現場到着</div><div className="p-col p-label w-[20%]">接触</div><div className="p-col p-label w-[20%]">車内収容</div><div className="p-col p-label w-[20%]">現場出発</div><div className="p-col p-label w-[20%]">病院到着</div>
-                    </div>
-                    <div className="p-row font-bold font-sans text-[14px]">
-                        <div className="p-col p-label w-[20%]">{hStr(data.arrivalAtSceneTime)}時 {mStr(data.arrivalAtSceneTime)}分</div>
-                        <div className="p-col p-label w-[20%]">{hStr(data.contactTime)}時 {mStr(data.contactTime)}分</div>
-                        <div className="p-col p-label w-[20%]">{hStr(data.accommodationTime)}時 {mStr(data.accommodationTime)}分</div>
-                        <div className="p-col p-label w-[20%]">{hStr(data.departureFromSceneTime)}時 {mStr(data.departureFromSceneTime)}分</div>
-                        <div className="p-col p-label w-[20%]">{hStr(data.arrivalAtHospitalTime)}時 {mStr(data.arrivalAtHospitalTime)}分</div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[4%] writing-vertical py-4">傷病者</div>
-                        <div className="w-[96%] flex flex-col">
-                        <div className="p-row-inner">
-                            <div className="p-col p-label w-[10%]">氏名</div><div className="p-col w-[44%] font-bold text-[16px] font-sans">{data.patientName}</div>
-                            <div className="p-col p-label w-[10%]">性別</div><div className="p-col p-label w-[16%]"><CircleText text="男" active={data.gender === '男'} /> ・ <CircleText text="女" active={data.gender === '女'} /></div>
-                            <div className="p-col p-label w-[10%]">年齢</div><div className="p-col p-label w-[10%]">{data.age ? `${data.age} 歳` : '　　歳'}</div>
-                        </div>
-                        <div className="p-row-inner">
-                            <div className="p-col p-label w-[10%]">住所</div><div className="p-col w-[60%]">{data.address}</div>
-                            <div className="p-col p-label w-[10%]">電話</div><div className="p-col w-[20%]">{data.phone}</div>
-                        </div>
-                        <div className="p-row-inner">
-                            <div className="p-col p-label w-[10%]">生年月日</div>
-                            <div className="p-col w-[90%] pl-4">
-                            <CircleText text="T" active={data.birthEra === 'T'} /> ・ <CircleText text="S" active={data.birthEra === 'S'} /> ・ <CircleText text="H" active={data.birthEra === 'H'} /> ・ <CircleText text="R" active={data.birthEra === 'R'} />
-                            <span className="ml-6">{data.birthYear || '　　'} 年 {data.birthMonth || '　　'} 月 {data.birthDay || '　　'} 日</span>
+                    <div className="text-center text-xl font-bold mb-2 tracking-widest font-sans">救急隊活動記録票</div>
+                    
+                    <div className="pf-wrap">
+                        
+                        {/* 1. 発症・救急隊 */}
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>発症日時</div>
+                            <div className="pf-c" style={{width: '38%'}}>
+                                <span className="w-6 text-center font-sans">{oDate.month}</span>月
+                                <span className="w-6 text-center font-sans">{oDate.day}</span>日
+                                <span className="w-6 text-center font-sans">{oTime.h}</span>時
+                                <span className="w-6 text-center font-sans">{oTime.m}</span>分
+                                <span className="ml-4">西暦</span>
+                                <span className="w-10 text-center font-sans">{oDate.year}</span>年
+                            </div>
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>救急隊名</div>
+                            <div className="pf-c justify-between px-2" style={{width: '38%'}}>
+                                <span className="font-sans font-bold text-[13px]">{data.teamName}</span>
+                                <span>救急隊</span>
                             </div>
                         </div>
+
+                        {/* 2. 覚知・事案等 */}
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>覚知日時</div>
+                            <div className="pf-c" style={{width: '26%'}}>
+                                <span className="w-6 text-center font-sans">{aDate.month}</span>月
+                                <span className="w-6 text-center font-sans">{aDate.day}</span>日
+                                <span className="w-6 text-center font-sans">{aTime.h}</span>時
+                                <span className="w-6 text-center font-sans">{aTime.m}</span>分
+                            </div>
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>事案番号</div>
+                            <div className="pf-c font-sans font-bold text-[13px]" style={{width: '16%'}}>{data.incidentNumber}</div>
+                            <div className="pf-c pf-lbl" style={{width: '8%'}}>指令</div>
+                            <div className="pf-c font-sans" style={{width: '8%'}}>{data.directive}</div>
+                            <div className="pf-c pf-lbl text-[10px]" style={{width: '10%'}}>記載者名</div>
+                            <div className="pf-c font-sans" style={{width: '8%'}}>{data.recorderName}</div>
                         </div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[12%]">発生場所</div><div className="p-col w-[30%]">{data.occurrenceLocation}</div>
-                        <div className="p-col p-label w-[12%]">事故原因</div><div className="p-col w-[26%]">{data.accidentCause}</div>
-                        <div className="p-col p-label w-[10%] text-[10px]">発生形態</div><div className="p-col w-[10%]">{data.occurrenceType}</div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[12%] items-start pt-2">主訴</div><div className="p-col w-[88%] items-start pt-2 min-h-[48px]">{data.chiefComplaint}</div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[16%]">口頭指導</div>
-                        <div className="p-col w-[34%] pl-2">
-                        <Checkbox checked={data.verbalInstruction === '有'} label="有" /><Checkbox checked={data.verbalInstruction === '無'} label="無" />
-                        <span className="ml-4">{hStr(data.verbalInstructionTime)} 時 {mStr(data.verbalInstructionTime)} 分</span>
+
+                        {/* 3. 出場場所 */}
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>出場場所</div>
+                            <div className="pf-c font-sans" style={{width: '88%'}}>{data.dispatchLocation}</div>
                         </div>
-                        <div className="p-col p-label w-[20%] text-[11px]">心停止の推定原因</div>
-                        <div className="p-col w-[30%] pl-2">
-                        <Checkbox checked={data.arrestCause === '心原性'} label="心原性" /><Checkbox checked={data.arrestCause === '非心原性'} label="非心原性" />
+
+                        {/* 4. タイムライン */}
+                        <div className="pf-r font-sans text-[12px]">
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>現場到着</div>
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>接触</div>
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>車内収容</div>
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>現場出発</div>
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>病院到着</div>
                         </div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[16%]">心停止目撃</div>
-                        <div className="p-col w-[84%] pl-2">
-                        <Checkbox checked={data.witnessedArrest === '有'} label="有" /><Checkbox checked={data.witnessedArrest === '無'} label="無" />
-                        <span className="ml-2 mr-6">({hStr(data.witnessedTime)} 時 {mStr(data.witnessedTime)} 分)</span>
-                        <Checkbox checked={data.witnessedBy === '家族'} label="家族" /><Checkbox checked={data.witnessedBy === '救急隊'} label="救急隊" /><Checkbox checked={data.witnessedBy === '目撃者'} label="目撃者" />
-                        <Checkbox checked={['家族', '救急隊', '目撃者'].indexOf(data.witnessedBy) === -1 && data.witnessedBy !== ''} label={`他(${['家族', '救急隊', '目撃者', ''].indexOf(data.witnessedBy) === -1 ? data.witnessedBy : '　　'})`} />
+                        <div className="pf-r font-sans font-bold text-[14px]">
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>{hStr(data.arrivalAtSceneTime)}<span className="text-[10px] font-normal font-serif mx-1">時</span>{mStr(data.arrivalAtSceneTime)}<span className="text-[10px] font-normal font-serif ml-1">分</span></div>
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>{hStr(data.contactTime)}<span className="text-[10px] font-normal font-serif mx-1">時</span>{mStr(data.contactTime)}<span className="text-[10px] font-normal font-serif ml-1">分</span></div>
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>{hStr(data.accommodationTime)}<span className="text-[10px] font-normal font-serif mx-1">時</span>{mStr(data.accommodationTime)}<span className="text-[10px] font-normal font-serif ml-1">分</span></div>
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>{hStr(data.departureFromSceneTime)}<span className="text-[10px] font-normal font-serif mx-1">時</span>{mStr(data.departureFromSceneTime)}<span className="text-[10px] font-normal font-serif ml-1">分</span></div>
+                            <div className="pf-c pf-lbl" style={{width: '20%'}}>{hStr(data.arrivalAtHospitalTime)}<span className="text-[10px] font-normal font-serif mx-1">時</span>{mStr(data.arrivalAtHospitalTime)}<span className="text-[10px] font-normal font-serif ml-1">分</span></div>
                         </div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[16%] text-[10px]">バイスタンダーCPR</div>
-                        <div className="p-col w-[84%] pl-2">
-                        <Checkbox checked={data.bystanderCpr === '有'} label="有" /><Checkbox checked={data.bystanderCpr === '無'} label="無" />
-                        <span className="ml-2 mr-6">({hStr(data.bystanderCprTime)} 時 {mStr(data.bystanderCprTime)} 分)</span>
-                        <span className="mr-2">実施者:</span>
-                        <Checkbox checked={data.bystanderCprBy === '家族'} label="家族" />
-                        <Checkbox checked={data.bystanderCprBy !== '家族' && data.bystanderCprBy !== ''} label={`他(${data.bystanderCprBy !== '家族' ? data.bystanderCprBy : '　　'})`} />
-                        <span className="ml-6">その他資格(　　　　)</span>
-                        </div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[16%] items-start pt-2">初期ECG</div>
-                        <div className="p-col w-[84%] flex-col items-start py-2 pl-2">
-                        <div className="flex w-full mb-2 items-center">
-                            <Checkbox checked={data.initialEcg === 'VF'} label="VF" /><Checkbox checked={data.initialEcg === 'PEA'} label="PEA" />
-                            <Checkbox checked={data.initialEcg === '心静止'} label="心静止" /><Checkbox checked={data.initialEcg === 'VT'} label="VT" />
-                            <span className="ml-8 mr-2">場所:</span><Checkbox checked={data.initialEcgLocation === '現場'} label="現場" /><Checkbox checked={data.initialEcgLocation === '車内'} label="車内" />
-                        </div>
-                        <div className="flex w-full items-center">
-                            <span className="mr-6">({hStr(data.initialEcgTime)} 時 {mStr(data.initialEcgTime)} 分)</span>
-                            <span className="mr-2">時期:</span><Checkbox checked={false} label="接触時" /><Checkbox checked={false} label="病院到着時" />
-                            <span className="ml-10">評価( {data.initialEcgEval || '　　　　　　'} )</span>
-                        </div>
-                        </div>
-                    </div>
-                    <div className="p-row flex-col">
-                        <div className="w-full text-left font-bold text-[12px] py-1 px-2 border-b border-black tracking-widest bg-gray-50">処 置 ・ 観 察 経 過</div>
-                        <table className="w-full border-collapse text-center" style={{ tableLayout: 'fixed' }}>
-                        <thead>
-                            <tr className="border-b border-black text-[10px] bg-gray-50">
-                            <th className="border-r border-black font-normal w-[8%] p-1">時刻</th><th className="border-r border-black font-normal w-[10%] p-1">実施場所</th>
-                            <th className="border-r border-black font-normal w-[8%] p-1">意識</th><th className="border-r border-black font-normal w-[8%] p-1">呼吸</th>
-                            <th className="border-r border-black font-normal w-[8%] p-1">脈拍</th><th className="border-r border-black font-normal w-[10%] p-1">血圧</th>
-                            <th className="border-r border-black font-normal w-[10%] p-1">ECG</th><th className="border-r border-black font-normal w-[8%] p-1">SpO2</th>
-                            <th className="border-r border-black font-normal w-[12%] p-1">指示医師名</th><th className="border-r border-black font-normal w-[10%] p-1">応急処置</th>
-                            <th className="font-normal w-[8%] p-1">備考</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {displayObs1.map((obs, i) => {
-                            const obsTime = splitTime(obs.time);
-                            return (
-                                <tr key={i} className="border-b border-black last:border-b-0 h-7">
-                                <td className="border-r border-black p-0">{obs.time ? `${obsTime.h}:${obsTime.m}` : ''}</td><td className="border-r border-black p-0">{obs.location}</td>
-                                <td className="border-r border-black p-0">{obs.consciousness}</td><td className="border-r border-black p-0">{obs.respiration}</td>
-                                <td className="border-r border-black p-0">{obs.pulse}</td><td className="border-r border-black p-0">{obs.bp}</td>
-                                <td className="border-r border-black p-0">{obs.ecg}</td><td className="border-r border-black p-0">{obs.spo2}</td>
-                                <td className="border-r border-black p-0 text-[10px]">{obs.doctor}</td><td className="border-r border-black p-0 px-1 text-left text-[9px] truncate">{obs.treatment}</td>
-                                <td className="p-0 px-1 text-left text-[9px] truncate">{obs.notes}</td>
-                                </tr>
-                            );
-                            })}
-                        </tbody>
-                        </table>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col w-full text-left pl-4 py-3 bg-gray-50">
-                        <span className="mr-10">同乗者( <CircleText text="有" active={data.passenger === '有'} /> ・ <CircleText text="無" active={data.passenger === '無'} /> )</span>
-                        <span className="mr-10">家族連絡( <CircleText text="済" active={data.familyContact === '済'} /> ・ <CircleText text="未" active={data.familyContact === '未'} /> )</span>
-                        <span>診察券番号( {data.patientCardNumber || '　　　　　　　　'} )</span>
-                        </div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[16%] text-[11px]">収容医療機関名</div><div className="p-col w-[34%] font-bold font-sans text-[14px]">{data.hospitalName}</div>
-                        <div className="p-col p-label w-[12%]">医師名</div><div className="p-col w-[38%]">{data.doctorName}</div>
-                    </div>
-                    <div className="p-row">
-                        <div className="p-col p-label w-[16%]">傷病名</div><div className="p-col w-[34%] font-sans">{data.diagnosisName}</div>
-                        <div className="p-col p-label w-[12%]">程度</div>
-                        <div className="p-col p-label w-[38%]">
-                        <CircleText text="死" active={data.severity === '死'} /> ・ <CircleText text="重" active={data.severity === '重'} /> ・ <CircleText text="中" active={data.severity === '中'} /> ・ <CircleText text="軽" active={data.severity === '軽'} />
-                        </div>
-                    </div>
-                    {hasInstructions && (
-                        <div className="p-row">
-                        <div className="p-col p-label w-[16%] text-[10px] leading-tight pt-2 items-start">指示医師<br/>指示事項</div>
-                        <div className="p-col w-[84%] flex-col items-start pt-2 pb-2 min-h-[48px]">
-                            {doctorObs.map((obs, idx) => {
-                            if (!obs.instructionText && !obs.instructionTime) return null;
-                            return (
-                                <div key={obs.id} className={`w-full ${idx > 0 ? 'mt-2 pt-2 border-t border-dashed border-gray-400' : ''}`}>
-                                <div className="mb-1 text-[11px] font-bold">【{obs.doctor} 医師】 {obs.instructionTime ? `指示時間: ${obs.instructionTime}` : ''}</div>
-                                <div className="whitespace-pre-wrap w-full text-[11px] leading-relaxed">{obs.instructionText}</div>
+
+                        {/* 5. 傷病者情報 */}
+                        <div className="flex w-full border-b border-black">
+                            <div className="pf-c pf-v py-6" style={{width: '4%'}}>傷病者</div>
+                            <div className="flex flex-col" style={{width: '96%'}}>
+                                <div className="pf-r border-b border-black">
+                                    <div className="pf-c pf-lbl" style={{width: '10%'}}>氏名</div>
+                                    <div className="pf-c font-sans font-bold text-[14px]" style={{width: '44%'}}>{data.patientName}</div>
+                                    <div className="pf-c pf-lbl" style={{width: '10%'}}>性別</div>
+                                    <div className="pf-c" style={{width: '16%'}}><PdfCircle checked={data.gender === '男'} label="男" />・<PdfCircle checked={data.gender === '女'} label="女" /></div>
+                                    <div className="pf-c pf-lbl" style={{width: '10%'}}>年齢</div>
+                                    <div className="pf-c" style={{width: '10%'}}><span className="w-8 text-center font-sans">{data.age}</span>歳</div>
                                 </div>
-                            );
-                            })}
+                                <div className="pf-r border-b border-black">
+                                    <div className="pf-c pf-lbl" style={{width: '10%'}}>住所</div>
+                                    <div className="pf-c font-sans" style={{width: '60%'}}>{data.address}</div>
+                                    <div className="pf-c pf-lbl" style={{width: '10%'}}>電話</div>
+                                    <div className="pf-c font-sans" style={{width: '20%'}}>{data.phone}</div>
+                                </div>
+                                <div className="pf-r border-b-0">
+                                    <div className="pf-c pf-lbl" style={{width: '10%'}}>生年月日</div>
+                                    <div className="pf-c pl-4" style={{width: '90%'}}>
+                                        <PdfCircle checked={data.birthEra === 'T'} label="T" />・<PdfCircle checked={data.birthEra === 'S'} label="S" />・<PdfCircle checked={data.birthEra === 'H'} label="H" />・<PdfCircle checked={data.birthEra === 'R'} label="R" />
+                                        <span className="ml-6 w-6 text-center font-sans">{data.birthYear}</span>年
+                                        <span className="w-6 text-center font-sans">{data.birthMonth}</span>月
+                                        <span className="w-6 text-center font-sans">{data.birthDay}</span>日
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* 6. 発生状況 */}
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>発生場所</div>
+                            <div className="pf-c font-sans" style={{width: '28%'}}>{data.occurrenceLocation}</div>
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>事故原因</div>
+                            <div className="pf-c font-sans" style={{width: '28%'}}>{data.accidentCause}</div>
+                            <div className="pf-c pf-lbl text-[10px]" style={{width: '10%'}}>発生形態</div>
+                            <div className="pf-c font-sans text-[10px]" style={{width: '10%'}}>{data.occurrenceType}</div>
                         </div>
-                    )}
+                        <div className="pf-r min-h-[44px]">
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>主訴</div>
+                            <div className="pf-c font-sans items-start pt-1" style={{width: '88%'}}>{data.chiefComplaint}</div>
+                        </div>
+
+                        {/* 7. 心停止関連 */}
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl" style={{width: '16%'}}>口頭指導</div>
+                            <div className="pf-c" style={{width: '34%'}}>
+                                <PdfCheck checked={data.verbalInstruction === '有'} label="有" />
+                                <PdfCheck checked={data.verbalInstruction === '無'} label="無" />
+                                <span className="ml-6 w-6 text-center font-sans">{hStr(data.verbalInstructionTime)}</span>時 
+                                <span className="w-6 text-center font-sans">{mStr(data.verbalInstructionTime)}</span>分
+                            </div>
+                            <div className="pf-c pf-lbl text-[11px]" style={{width: '20%'}}>心停止の推定原因</div>
+                            <div className="pf-c" style={{width: '30%'}}>
+                                <PdfCheck checked={data.arrestCause === '心原性'} label="心原性" />
+                                <PdfCheck checked={data.arrestCause === '非心原性'} label="非心原性" />
+                            </div>
+                        </div>
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl" style={{width: '16%'}}>心停止目撃</div>
+                            <div className="pf-c" style={{width: '84%'}}>
+                                <PdfCheck checked={data.witnessedArrest === '有'} label="有" />
+                                <PdfCheck checked={data.witnessedArrest === '無'} label="無" />
+                                <span className="ml-4 w-6 text-center font-sans">{hStr(data.witnessedTime)}</span>時 
+                                <span className="w-6 text-center font-sans">{mStr(data.witnessedTime)}</span>分
+                                <span className="ml-8">
+                                    <PdfCheck checked={data.witnessedBy === '家族'} label="家族" />
+                                    <PdfCheck checked={data.witnessedBy === '救急隊'} label="救急隊" />
+                                    <PdfCheck checked={data.witnessedBy === '目撃者'} label="目撃者" />
+                                    <PdfCheck checked={['家族', '救急隊', '目撃者'].indexOf(data.witnessedBy) === -1 && data.witnessedBy !== ''} label={`他(${['家族', '救急隊', '目撃者', ''].indexOf(data.witnessedBy) === -1 ? data.witnessedBy : '　　'})`} />
+                                </span>
+                            </div>
+                        </div>
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl text-[10px]" style={{width: '16%'}}>バイスタンダーCPR</div>
+                            <div className="pf-c" style={{width: '84%'}}>
+                                <PdfCheck checked={data.bystanderCpr === '有'} label="有" />
+                                <PdfCheck checked={data.bystanderCpr === '無'} label="無" />
+                                <span className="ml-4 w-6 text-center font-sans">{hStr(data.bystanderCprTime)}</span>時 
+                                <span className="w-6 text-center font-sans">{mStr(data.bystanderCprTime)}</span>分
+                                <span className="ml-8 mr-2">実施者:</span>
+                                <PdfCheck checked={data.bystanderCprBy === '家族'} label="家族" />
+                                <PdfCheck checked={data.bystanderCprBy !== '家族' && data.bystanderCprBy !== ''} label={`他(${data.bystanderCprBy !== '家族' ? data.bystanderCprBy : '　　'})`} />
+                                <span className="ml-4">その他資格(　　　　)</span>
+                            </div>
+                        </div>
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl" style={{width: '16%'}}>初期ECG</div>
+                            <div className="pf-c flex-col items-start py-1 leading-relaxed" style={{width: '84%'}}>
+                                <div className="flex w-full mb-1">
+                                    <PdfCheck checked={data.initialEcg === 'VF'} label="VF" />
+                                    <PdfCheck checked={data.initialEcg === 'PEA'} label="PEA" />
+                                    <PdfCheck checked={data.initialEcg === '心静止'} label="心静止" />
+                                    <PdfCheck checked={data.initialEcg === 'VT'} label="VT" />
+                                    <span className="ml-6 mr-2">現場・車内</span>
+                                    <span className="w-6 text-center font-sans">{hStr(data.initialEcgTime)}</span>時
+                                    <span className="w-6 text-center font-sans">{mStr(data.initialEcgTime)}</span>分
+                                </div>
+                                <div className="flex w-full">
+                                    <span className="mr-2">時期:</span>
+                                    <PdfCheck checked={false} label="接触時" />
+                                    <PdfCheck checked={false} label="病院到着時" />
+                                    <span className="ml-8">評価( <span className="inline-block w-24 text-center font-sans border-b border-dashed border-gray-400">{data.initialEcgEval}</span> )</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 8. 処置・観察経過 */}
+                        <div className="flex w-full border-b border-black">
+                            <div className="pf-c pf-v py-6" style={{width: '4%'}}>処置・観察経過</div>
+                            <div className="flex flex-col" style={{width: '96%'}}>
+                                <div className="pf-r border-b border-black bg-gray-50" style={{minHeight: '20px'}}>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '8%'}}>時刻</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '10%'}}>実施場所</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '8%'}}>意識</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '8%'}}>呼吸</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '8%'}}>脈拍</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '9%'}}>血圧</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '9%'}}>ECG</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '7%'}}>SpO2</div>
+                                    <div className="pf-c pf-lbl font-normal px-0 text-[9px]" style={{width: '13%'}}>指示医師名</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '10%'}}>応急処置</div>
+                                    <div className="pf-c pf-lbl font-normal px-0" style={{width: '10%'}}>備考</div>
+                                </div>
+                                {displayObs1.map((obs, i) => {
+                                    const obsTime = splitTime(obs.time);
+                                    return (
+                                        <div key={i} className={`pf-r font-sans ${i === displayObs1.length - 1 ? 'border-b-0' : 'border-b border-black'}`} style={{minHeight: '24px'}}>
+                                            <div className="pf-c justify-center px-0" style={{width: '8%'}}>{obs.time ? `${obsTime.h}:${obsTime.m}` : ''}</div>
+                                            <div className="pf-c justify-center px-0" style={{width: '10%'}}>{obs.location}</div>
+                                            <div className="pf-c justify-center px-0" style={{width: '8%'}}>{obs.consciousness}</div>
+                                            <div className="pf-c justify-center px-0" style={{width: '8%'}}>{obs.respiration}</div>
+                                            <div className="pf-c justify-center px-0" style={{width: '8%'}}>{obs.pulse}</div>
+                                            <div className="pf-c justify-center px-0" style={{width: '9%'}}>{obs.bp}</div>
+                                            <div className="pf-c justify-center px-0" style={{width: '9%'}}>{obs.ecg}</div>
+                                            <div className="pf-c justify-center px-0" style={{width: '7%'}}>{obs.spo2}</div>
+                                            <div className="pf-c px-1 text-[9px] truncate" style={{width: '13%'}}>{obs.doctor}</div>
+                                            <div className="pf-c px-1 text-[9px] truncate" style={{width: '10%'}}>{obs.treatment}</div>
+                                            <div className="pf-c px-1 text-[9px] truncate" style={{width: '10%'}}>{obs.notes}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* 9. 収容情報 */}
+                        <div className="pf-r min-h-[32px]">
+                            <div className="pf-c px-4" style={{width: '100%'}}>
+                                <span>同乗者(<PdfCircle checked={data.passenger === '有'} label="有" /> <PdfCircle checked={data.passenger === '無'} label="無" />)</span>
+                                <span className="ml-12">家族連絡(<PdfCircle checked={data.familyContact === '済'} label="済" /> <PdfCircle checked={data.familyContact === '未'} label="未" />)</span>
+                                <span className="ml-12">診察券番号( <span className="inline-block w-24 text-center font-sans border-b border-dashed border-gray-400">{data.patientCardNumber}</span> )</span>
+                            </div>
+                        </div>
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl text-[11px]" style={{width: '16%'}}>収容医療機関名</div>
+                            <div className="pf-c font-sans font-bold text-[14px]" style={{width: '34%'}}>{data.hospitalName}</div>
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>医師名</div>
+                            <div className="pf-c font-sans" style={{width: '38%'}}>{data.doctorName}</div>
+                        </div>
+                        <div className="pf-r">
+                            <div className="pf-c pf-lbl" style={{width: '16%'}}>傷病名</div>
+                            <div className="pf-c font-sans" style={{width: '34%'}}>{data.diagnosisName}</div>
+                            <div className="pf-c pf-lbl" style={{width: '12%'}}>程度</div>
+                            <div className="pf-c" style={{width: '38%'}}>
+                                <PdfCircle checked={data.severity === '死'} label="死" />・
+                                <PdfCircle checked={data.severity === '重'} label="重" />・
+                                <PdfCircle checked={data.severity === '中'} label="中" />・
+                                <PdfCircle checked={data.severity === '軽'} label="軽" />
+                            </div>
+                        </div>
+
+                        {/* 指示事項 (データがある場合のみ) */}
+                        {hasInstructions && (
+                            <div className="pf-r min-h-[44px]">
+                                <div className="pf-c pf-lbl text-[10px]" style={{width: '16%'}}>指示医師<br/>指示事項</div>
+                                <div className="pf-c flex-col items-start py-2" style={{width: '84%'}}>
+                                    {doctorObs.map((obs, idx) => {
+                                    if (!obs.instructionText && !obs.instructionTime) return null;
+                                    return (
+                                        <div key={obs.id} className={`w-full ${idx > 0 ? 'mt-2 pt-2 border-t border-dashed border-gray-400' : ''}`}>
+                                            <div className="mb-1 text-[11px] font-bold">【<span className="font-sans">{obs.doctor}</span> 医師】 {obs.instructionTime ? `指示時間: ${obs.instructionTime}` : ''}</div>
+                                            <div className="whitespace-pre-wrap w-full text-[11px] leading-relaxed font-sans">{obs.instructionText}</div>
+                                        </div>
+                                    );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
+                {/* --- 2ページ目以降 (続紙) --- */}
                 {extraPages.map((chunk, pageIndex) => (
                     <div key={`page-${pageIndex}`} className="print-page">
-                    <div className="flex justify-between items-end mb-2 border-b-2 border-black pb-1">
-                        <div className="text-lg font-bold font-sans tracking-widest">
-                        救急隊活動記録票 <span className="text-sm font-normal ml-2">(処置・観察経過 続紙 {pageIndex + 1})</span>
+                        <div className="flex justify-between items-end mb-2 border-b-2 border-black pb-1">
+                            <div className="text-lg font-bold font-sans tracking-widest">
+                            救急隊活動記録票 <span className="text-sm font-normal ml-2">(処置・観察経過 続紙 {pageIndex + 1})</span>
+                            </div>
+                            <div className="text-[12px] font-sans">
+                            <span className="mr-4">事案番号: <span className="font-bold">{data.incidentNumber || '未入力'}</span></span>
+                            <span>氏名: <span className="font-bold text-[14px]">{data.patientName || '未入力'}</span></span>
+                            </div>
                         </div>
-                        <div className="text-[12px] font-sans">
-                        <span className="mr-4">事案番号: <span className="font-bold">{data.incidentNumber || '未入力'}</span></span>
-                        <span>氏名: <span className="font-bold text-[14px]">{data.patientName || '未入力'}</span></span>
+                        <div className="pf-wrap mt-4">
+                            <div className="flex w-full">
+                                <div className="pf-c pf-v py-6" style={{width: '4%'}}>処置・観察経過</div>
+                                <div className="flex flex-col" style={{width: '96%'}}>
+                                    <div className="pf-r border-b border-black bg-gray-50" style={{minHeight: '20px'}}>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '8%'}}>時刻</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '10%'}}>実施場所</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '8%'}}>意識</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '8%'}}>呼吸</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '8%'}}>脈拍</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '9%'}}>血圧</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '9%'}}>ECG</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '7%'}}>SpO2</div>
+                                        <div className="pf-c pf-lbl font-normal px-0 text-[9px]" style={{width: '13%'}}>指示医師名</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '10%'}}>応急処置</div>
+                                        <div className="pf-c pf-lbl font-normal px-0" style={{width: '10%'}}>備考</div>
+                                    </div>
+                                    {chunk.map((obs, i) => {
+                                        const obsTime = splitTime(obs.time);
+                                        return (
+                                            <div key={i} className={`pf-r font-sans ${i === chunk.length - 1 ? 'border-b-0' : 'border-b border-black'}`} style={{minHeight: '28px'}}>
+                                                <div className="pf-c justify-center px-0" style={{width: '8%'}}>{obs.time ? `${obsTime.h}:${obsTime.m}` : ''}</div>
+                                                <div className="pf-c justify-center px-0" style={{width: '10%'}}>{obs.location}</div>
+                                                <div className="pf-c justify-center px-0" style={{width: '8%'}}>{obs.consciousness}</div>
+                                                <div className="pf-c justify-center px-0" style={{width: '8%'}}>{obs.respiration}</div>
+                                                <div className="pf-c justify-center px-0" style={{width: '8%'}}>{obs.pulse}</div>
+                                                <div className="pf-c justify-center px-0" style={{width: '9%'}}>{obs.bp}</div>
+                                                <div className="pf-c justify-center px-0" style={{width: '9%'}}>{obs.ecg}</div>
+                                                <div className="pf-c justify-center px-0" style={{width: '7%'}}>{obs.spo2}</div>
+                                                <div className="pf-c px-1 text-[9px] truncate" style={{width: '13%'}}>{obs.doctor}</div>
+                                                <div className="pf-c px-1 text-[9px] truncate" style={{width: '10%'}}>{obs.treatment}</div>
+                                                <div className="pf-c px-1 text-[9px] truncate" style={{width: '10%'}}>{obs.notes}</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div className="print-wrap mt-4 border-t-0">
-                        <table className="w-full border-collapse text-center border-t-2 border-black" style={{ tableLayout: 'fixed' }}>
-                        <thead>
-                            <tr className="border-b border-black text-[10px] bg-gray-50 h-8">
-                            <th className="border-r border-black font-normal w-[8%] p-1">時刻</th><th className="border-r border-black font-normal w-[10%] p-1">実施場所</th>
-                            <th className="border-r border-black font-normal w-[8%] p-1">意識</th><th className="border-r border-black font-normal w-[8%] p-1">呼吸</th>
-                            <th className="border-r border-black font-normal w-[8%] p-1">脈拍</th><th className="border-r border-black font-normal w-[10%] p-1">血圧</th>
-                            <th className="border-r border-black font-normal w-[10%] p-1">ECG</th><th className="border-r border-black font-normal w-[8%] p-1">SpO2</th>
-                            <th className="border-r border-black font-normal w-[12%] p-1">指示医師名</th><th className="border-r border-black font-normal w-[10%] p-1">応急処置</th>
-                            <th className="font-normal w-[8%] p-1">備考</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {chunk.map((obs, i) => {
-                            const obsTime = splitTime(obs.time);
-                            return (
-                                <tr key={i} className="border-b border-black last:border-b-0 h-8">
-                                <td className="border-r border-black p-0">{obs.time ? `${obsTime.h}:${obsTime.m}` : ''}</td><td className="border-r border-black p-0">{obs.location}</td>
-                                <td className="border-r border-black p-0">{obs.consciousness}</td><td className="border-r border-black p-0">{obs.respiration}</td>
-                                <td className="border-r border-black p-0">{obs.pulse}</td><td className="border-r border-black p-0">{obs.bp}</td>
-                                <td className="border-r border-black p-0">{obs.ecg}</td><td className="border-r border-black p-0">{obs.spo2}</td>
-                                <td className="border-r border-black p-0 text-[10px]">{obs.doctor}</td><td className="border-r border-black p-0 px-1 text-left text-[9px] truncate">{obs.treatment}</td>
-                                <td className="p-0 px-1 text-left text-[9px] truncate">{obs.notes}</td>
-                                </tr>
-                            );
-                            })}
-                        </tbody>
-                        </table>
-                    </div>
                     </div>
                 ))}
                 </div>
@@ -893,8 +967,8 @@
             const [copied, setCopied] = useState(false);
             const [importStatus, setImportStatus] = useState(null);
             
-            const canvasRef = useRef(null);
-            // 既にHTML側でロードさせているため常にtrueで扱う
+            const canvasRefApp = useRef(null);
+            const canvasRefUrl = useRef(null);
             const [qrLoaded, setQrLoaded] = useState(true);
 
             const getExportString = () => {
@@ -924,21 +998,34 @@
             };
 
             const exportString = getExportString();
+            const exportUrl = window.location.origin + window.location.pathname + '?d=' + encodeURIComponent(exportString);
 
             useEffect(() => {
-                if (qrLoaded && canvasRef.current && exportString && window.QRious) {
+                if (qrLoaded && exportString && window.QRious) {
                 try {
-                    new window.QRious({
-                    element: canvasRef.current,
-                    value: exportString,
-                    size: 220,
-                    level: 'L'
-                    });
+                    // 医療機関向け(URL形式のQR)
+                    if (canvasRefUrl.current) {
+                        new window.QRious({
+                        element: canvasRefUrl.current,
+                        value: exportUrl,
+                        size: 220,
+                        level: 'L'
+                        });
+                    }
+                    // 検証官向け(文字列形式のQR)
+                    if (canvasRefApp.current) {
+                        new window.QRious({
+                        element: canvasRefApp.current,
+                        value: exportString,
+                        size: 220,
+                        level: 'L'
+                        });
+                    }
                 } catch (e) {
                     console.error("QR生成エラー");
                 }
                 }
-            }, [qrLoaded, exportString]);
+            }, [qrLoaded, exportString, exportUrl]);
 
             const handleCopy = () => {
                 if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1000,40 +1087,59 @@
 
             return (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center gap-2 mb-4 border-b pb-2">
-                    <Download className="text-blue-600" />
-                    <h2 className="text-lg font-bold">1. データを送る (救急隊)</h2>
-                    </div>
-                    <div className="space-y-4">
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                        <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1"><Mail size={16}/> スマホのメールで送付する</h3>
-                        <p className="text-xs text-gray-600 mb-3">配備されたスマホのメールアプリを直接起動し、検証官等のアドレスへ送信します。</p>
-                        <button onClick={handleMailTo} className="w-full flex justify-center items-center gap-2 py-2.5 rounded shadow transition-colors font-bold bg-blue-600 hover:bg-blue-700 text-white text-sm">
-                        メールアプリを起動
-                        </button>
-                    </div>
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                        <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1"><QrCode size={16}/> QRコードで読み取らせる</h3>
-                        <p className="text-xs text-gray-600 mb-2">検証官のPCに接続されたバーコードリーダー等で画面を読み取ると、ネットワークを介さずに安全に送信できます。</p>
-                        <div className="flex justify-center bg-white p-2 border rounded">
-                        <canvas ref={canvasRef} className="max-w-full"></canvas>
+                <div className="space-y-6">
+                    {/* 医療機関への申し送り */}
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-blue-200 bg-blue-50/30">
+                        <div className="flex items-center gap-2 mb-4 border-b border-blue-200 pb-2">
+                        <Hospital className="text-blue-700" />
+                        <h2 className="text-lg font-bold text-blue-800">医療機関へ申し送る (QR)</h2>
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-2 text-center">※入力文字数が多すぎる場合はQRコードが表示されないことがあります。その場合はコピー機能をご利用ください。</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                        <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1"><Copy size={16}/> コードをコピーして共有</h3>
-                        <div className="bg-white border border-gray-300 p-2 rounded mb-2 h-16 overflow-hidden break-all text-[10px] text-gray-400 font-mono select-all">
-                        {exportString}
+                        <p className="text-sm text-gray-700 mb-4">
+                            病院の医師や看護師のスマホ（標準カメラ）でこのQRコードを読み取ってもらうと、相手の端末の画面に記録サマリー（文字起こし）がそのまま表示されます。
+                        </p>
+                        <div className="flex justify-center bg-white p-4 border rounded shadow-sm">
+                            <canvas ref={canvasRefUrl} className="max-w-full"></canvas>
                         </div>
-                        <button onClick={handleCopy} className={`w-full flex justify-center items-center gap-2 py-2 rounded transition-colors font-bold text-sm ${copied ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
-                        {copied ? <Check size={16} /> : <Copy size={16} />}
-                        {copied ? 'コピーしました！' : '文字列をコピー'}
-                        </button>
+                        <p className="text-[10px] text-gray-500 mt-2 text-center">※このシステムがWeb上(GitHub等)で公開されている必要があります。</p>
                     </div>
+                    
+                    {/* エクスポート (検証官側へ) */}
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex items-center gap-2 mb-4 border-b pb-2">
+                        <Download className="text-blue-600" />
+                        <h2 className="text-lg font-bold">1. 検証官へデータを送る</h2>
+                        </div>
+                        <div className="space-y-4">
+                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
+                            <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1"><Mail size={16}/> スマホのメールで送付する</h3>
+                            <p className="text-xs text-gray-600 mb-3">配備されたスマホのメールアプリを直接起動し、検証官等のアドレスへ送信します。</p>
+                            <button onClick={handleMailTo} className="w-full flex justify-center items-center gap-2 py-2.5 rounded shadow transition-colors font-bold bg-blue-600 hover:bg-blue-700 text-white text-sm">
+                            メールアプリを起動
+                            </button>
+                        </div>
+                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
+                            <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1"><QrCode size={16}/> 専用QRコードで読み取らせる</h3>
+                            <p className="text-xs text-gray-600 mb-2">検証官PCのバーコードリーダーで読み取ります（完全オフライン）。</p>
+                            <div className="flex justify-center bg-white p-2 border rounded">
+                            <canvas ref={canvasRefApp} className="max-w-full"></canvas>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
+                            <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-1"><Copy size={16}/> コードをコピーして共有</h3>
+                            <div className="bg-white border border-gray-300 p-2 rounded mb-2 h-16 overflow-hidden break-all text-[10px] text-gray-400 font-mono select-all">
+                            {exportString}
+                            </div>
+                            <button onClick={handleCopy} className={`w-full flex justify-center items-center gap-2 py-2 rounded transition-colors font-bold text-sm ${copied ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
+                            {copied ? <Check size={16} /> : <Copy size={16} />}
+                            {copied ? 'コピーしました！' : '文字列をコピー'}
+                            </button>
+                        </div>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-green-200 bg-green-50/30">
+                
+                {/* インポート (検証官側) */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-green-200 bg-green-50/30 self-start">
                     <div className="flex items-center gap-2 mb-4 border-b border-green-200 pb-2">
                     <Upload className="text-green-700" />
                     <h2 className="text-lg font-bold text-green-800">2. データを受け取る (検証官)</h2>
