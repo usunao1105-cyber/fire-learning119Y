@@ -1,8 +1,7 @@
 {
-  "name": "救急隊活動記録票（DX版）",
+  "name": "救急隊活動記録票",
   "short_name": "活動記録",
-  "description": "救急活動の記録、検証、文字起こしを行うアプリケーション",
-  "start_url": "index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f3f4f6",
   "theme_color": "#1e40af",
