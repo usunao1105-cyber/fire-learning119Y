@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ems-record-cache-v3'; // 強制リセットのために v3 に変更
+const CACHE_NAME = 'ems-record-cache-v4'; // 強制リセットのために v4 に変更
 
 // キャッシュしておきたいファイルを指定します（アイコンも追加しました）
 const urlsToCache = [
