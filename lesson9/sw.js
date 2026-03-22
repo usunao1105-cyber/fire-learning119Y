@@ -1,9 +1,12 @@
-const CACHE_NAME = 'ems-record-cache-v2'; // ここを v1 から v2 に変更しました
+const CACHE_NAME = 'ems-record-cache-v3'; // 強制リセットのために v3 に変更
 
-// キャッシュしておきたいファイルを指定します
+// キャッシュしておきたいファイルを指定します（アイコンも追加しました）
 const urlsToCache = [
+  './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon-192x192.png',
+  './icon-512x512.png'
 ];
 
 // インストール時の処理（キャッシュの保存と即時有効化）
