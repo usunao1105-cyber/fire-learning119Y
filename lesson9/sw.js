@@ -1,12 +1,12 @@
-const CACHE_NAME = 'ems-record-cache-v4'; // 強制リセットのために v4 に変更
+const CACHE_NAME = 'ems-record-cache-v6'; // 画像入れ替えテストのために v6 に変更
 
-// キャッシュしておきたいファイルを指定します（アイコンも追加しました）
+// キャッシュしておきたいファイルを指定します（v6 に変更しました）
 const urlsToCache = [
   './',
   './index.html',
   './manifest.json',
-  './icon-192x192.png',
-  './icon-512x512.png'
+  './icon-192x192.png?v=6',
+  './icon-512x512.png?v=6'
 ];
 
 // インストール時の処理（キャッシュの保存と即時有効化）
