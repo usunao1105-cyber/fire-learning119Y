@@ -178,6 +178,9 @@
         <button id="btn-my-location" class="bg-white p-2 rounded shadow-md border border-gray-300 hover:bg-gray-100 text-blue-600 font-bold" title="現在地に戻る">
           📍 現在地
         </button>
+        <button id="btn-reconnect-gps" class="bg-white p-2 rounded shadow-md border border-green-300 text-green-600 hover:bg-green-50 font-bold" title="GPSの再取得">
+          🛰️ 再接続
+        </button>
         <button id="btn-leave" class="bg-white p-2 rounded shadow-md border border-red-300 text-red-600 hover:bg-red-50" title="退出する">
           🚪 退出
         </button>
@@ -229,7 +232,8 @@
         </button>
         <input type="file" id="image-input" accept="image/*" class="hidden">
 
-        <input type="text" id="chat-input" class="flex-1 rounded-full py-2 px-4 border border-gray-300 focus:outline-none focus:border-indigo-500 text-sm" placeholder="メッセージを送信...">
+        <!-- プレースホルダーをAI対応に変更 -->
+        <input type="text" id="chat-input" class="flex-1 rounded-full py-2 px-4 border border-gray-300 focus:outline-none focus:border-indigo-500 text-sm" placeholder="メッセージ送信 (@AIで質問)">
         <button id="btn-send-chat" class="bg-blue-600 text-white rounded-full p-2 w-10 h-10 flex items-center justify-center hover:bg-blue-700 shadow flex-shrink-0">
           ➤
         </button>
@@ -484,6 +488,12 @@
         return;
       }
 
+      // ★追加: 既存の監視があれば一度クリアする（再接続時に重複させないため）
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+
       watchId = navigator.geolocation.watchPosition(
         async (position) => {
           const lat = position.coords.latitude;
@@ -594,6 +604,7 @@
           if (change.type === "added") {
             const data = change.doc.data();
             
+            // テキスト出力用にログを保存する
             let logTime = "";
             if (data.timestamp) {
               const dateObj = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
@@ -608,7 +619,8 @@
             fullChatLog.push(logEntry);
 
             let type = 'other';
-            if (data.senderId === currentUser.uid) type = 'me';
+            if (data.senderId === 'ai-assistant') type = 'ai'; // ★AI用のメッセージタイプを追加
+            else if (data.senderId === currentUser.uid) type = 'me';
             else if (data.senderId === 'system') type = 'system';
             
             addChatMessage(data, type); 
@@ -671,6 +683,38 @@
       document.getElementById('modal-image-viewer').classList.remove('hidden');
     }
 
+    // --- Gemini API (LLM) 連携機能 ---
+    async function callGeminiAPI(prompt) {
+      const apiKey = ""; // Canvas環境が自動的にキーを提供します
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+      
+      // 最近のチャット履歴（最大10件）をコンテキストとして抽出
+      const chatHistoryLog = fullChatLog.slice(-10).join('\n');
+      const fullPrompt = `あなたはプロのレスキュー隊・山岳水難捜索の支援AIです。現場からの質問に対して、簡潔かつ的確なアドバイスを返してください。\n\n【直近の現場チャットログ】\n${chatHistoryLog}\n\n【隊員からの質問】\n${prompt}`;
+
+      const payload = {
+        contents: [{ parts: [{ text: fullPrompt }] }]
+      };
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+      } catch (error) {
+        console.error("Gemini API Error:", error);
+        return "⚠️ AIアシスタントへの接続に失敗しました。";
+      }
+    }
+
     async function sendChat() {
       const text = chatInput.value.trim();
       
@@ -696,6 +740,21 @@
         }
 
         await addDoc(collection(db, getCollectionPath('chat')), chatData);
+
+        // ★追加：AI コマンドの検知と自動応答
+        if (text.startsWith('@AI') || text.startsWith('＠ＡＩ')) {
+          const userQuery = text.replace(/^@AI|^＠ＡＩ/i, '').trim();
+          
+          callGeminiAPI(userQuery).then(async (aiResponse) => {
+             await addDoc(collection(db, getCollectionPath('chat')), {
+              senderId: 'ai-assistant',
+              senderName: '✨ AIアドバイザー',
+              text: `> ${userQuery}\n\n${aiResponse}`,
+              timestamp: serverTimestamp()
+            });
+          });
+        }
+
       } catch (e) {
         console.error("チャット送信エラー", e);
         alert("送信に失敗しました");
@@ -724,6 +783,16 @@
       if (type === 'system') {
         div.className = "text-center text-xs text-gray-500 my-2";
         div.textContent = text;
+      } else if (type === 'ai') {
+        // ★追加：AIアシスタント専用の特別なスタイル
+        div.className = "flex flex-col items-start w-full my-1";
+        div.innerHTML = `
+          <div class="flex items-center space-x-1 mb-1">
+            <span class="text-indigo-600 text-sm">✨</span>
+            <span class="text-[10px] text-indigo-700 font-bold">${name}</span>
+          </div>
+          <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 text-gray-800 p-3 rounded-lg rounded-tl-none max-w-[95%] text-sm shadow flex flex-col items-start whitespace-pre-wrap leading-relaxed">${contentHtml}</div>
+        `;
       } else if (type === 'me') {
         div.className = "flex flex-col items-end my-1";
         div.innerHTML = `
@@ -775,8 +844,7 @@
       });
     }
 
-    // === UI制御関連 ===
-    
+    // チャットログをコピーする機能
     document.getElementById('btn-export-chat').addEventListener('click', () => {
       if (fullChatLog.length === 0) {
         alert("コピーする通信ログがありません。");
@@ -813,17 +881,39 @@
       
       container.innerHTML = ""; 
       
-      const baseUrl = window.location.href.split('?')[0];
+      let baseUrl = window.location.href.split('?')[0];
+      
+      // ★追加: プレビュー環境の特殊なURLの場合は、ご自身のGitHubのURLを強制的に使用する
+      if (isPreview || baseUrl.startsWith('blob:') || baseUrl.startsWith('about:')) {
+        baseUrl = "https://usunao1105-cyber.github.io/fire-learning119Y/lesson11/index.html";
+      }
+      
       const joinUrl = `${baseUrl}?op=${operationId}`;
       
-      new QRCode(container, {
-        text: joinUrl,
-        width: 150,
-        height: 150
-      });
+      try {
+        new QRCode(container, {
+          text: joinUrl,
+          width: 160,
+          height: 160,
+          colorDark : "#000000",
+          colorLight : "#ffffff",
+          correctLevel : QRCode.CorrectLevel.L // ★追加: 模様を少しシンプルにして読み取りやすくする
+        });
+      } catch (e) {
+        console.error("QRコード生成エラー", e);
+        container.innerHTML = "<span class='text-red-500 text-xs'>QRコードの生成に失敗しました</span>";
+      }
       
       urlDisplay.textContent = joinUrl;
       modal.classList.remove('hidden');
+
+      // プレビュー画面でのテスト用であることの注意書きを追加
+      if (isPreview) {
+        const warning = document.createElement('p');
+        warning.className = "text-[10px] text-red-500 mt-2 font-bold";
+        warning.textContent = "※テスト用: スマホで読むとGitHubの公開ページへ飛びます";
+        container.appendChild(warning);
+      }
     }
 
     document.getElementById('btn-show-qr').addEventListener('click', showQRCode);
@@ -839,6 +929,39 @@
       membersPanel.classList.add('translate-x-full');
     });
 
+    // 現在地に戻る (現場)
+    document.getElementById('btn-my-location').addEventListener('click', () => {
+      if (markers[currentUser.uid]) {
+        map.setView(markers[currentUser.uid].getLatLng(), 16);
+      }
+    });
+
+    // ★追加：GPS手動再接続機能 (現場)
+    document.getElementById('btn-reconnect-gps').addEventListener('click', () => {
+      if (currentRole !== 'field') return;
+      
+      const btn = document.getElementById('btn-reconnect-gps');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '⏳ 接続中';
+      
+      // GPS監視を再起動
+      startGPS();
+      
+      // 2秒後にボタン表示を戻す
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+      }, 2000);
+    });
+
+    // ★追加：スリープ復帰時の自動再接続機能
+    document.addEventListener("visibilitychange", () => {
+      // 画面が再び表示され、かつ現場隊員として活動中の場合
+      if (document.visibilityState === "visible" && currentRole === 'field') {
+        startGPS(); // GPS監視を裏側で再起動
+      }
+    });
+
+    // 退出処理 (現場・本部共通)
     const modalLeave = document.getElementById('modal-leave');
     
     document.getElementById('btn-logout').addEventListener('click', () => {
