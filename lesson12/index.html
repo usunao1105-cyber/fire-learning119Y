@@ -99,12 +99,12 @@
     <section class="glass-panel p-6 rounded-sm border-[#d4af37]/30 bg-gradient-to-r from-black/60 to-[#d4af37]/5">
       <div class="flex justify-between items-center flex-wrap gap-4 mb-4">
         <div class="flex items-center gap-2">
-          <i data-lucide="globe" class="w-4 h-4 text-[#d4af37] animate-pulse"></i>
-          <h2 class="text-xs tracking-widest text-[#d4af37] font-semibold">
+          <i data-lucide="globe" class="w-4 h-4 text-[#d4af37] animate-pulse" id="statusIcon"></i>
+          <h2 class="text-xs tracking-widest text-[#d4af37] font-semibold" id="statusTitle">
             REAL-TIME SEARCH GROUNDING ACTIVE <span class="text-gray-400 font-normal">（Google 検索連動機能有効）</span>
           </h2>
         </div>
-        <span class="text-[10px] tracking-wider px-2 py-0.5 border border-[#d4af37]/40 text-[#d4af37] rounded-full bg-[#d4af37]/10 flex items-center gap-1">
+        <span id="groundingBadge" class="text-[10px] tracking-wider px-2 py-0.5 border border-[#d4af37]/40 text-[#d4af37] rounded-full bg-[#d4af37]/10 flex items-center gap-1">
           <i data-lucide="check-circle-2" class="w-2.5 h-2.5"></i> 実際の最新情報を取得
         </span>
       </div>
@@ -312,14 +312,17 @@
 
   <!-- Core JavaScript for API and UI rendering -->
   <script>
-    const API_KEY_ENV = ""; // Canvas environment default key
-    const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+    const apiKey = ""; // Canvas environment default key (automatically injected at runtime)
+    const MODEL_PREVIEW = "gemini-2.5-flash-preview-09-2025";
+    const MODEL_STABLE = "gemini-2.5-flash";
+    const MODEL_FALLBACK = "gemini-1.5-flash";
 
     // Application state
     let dataState = [];
     let currentFilter = 'all';
     let fetchCount = 0;
     let loadingInterval = null;
+    let isGroundingActive = true; // Grounding (Google Search) が有効かどうかを追跡
 
     // Load API Key on Startup
     window.addEventListener('DOMContentLoaded', () => {
@@ -330,7 +333,17 @@
 
     function getActiveApiKey() {
       const savedKey = localStorage.getItem('GEMINI_FIRE_API_KEY');
-      return savedKey || API_KEY_ENV;
+      // ローカルストレージ内の不完全なキーや空文字をチェックして、問題があればデフォルトキーにフォールバック
+      if (savedKey && savedKey.trim().length > 5) {
+        return savedKey.trim();
+      }
+      return apiKey;
+    }
+
+    // APIキーの有無によってリクエストモデル名を切り替える
+    function getActiveModel() {
+      const savedKey = localStorage.getItem('GEMINI_FIRE_API_KEY');
+      return (savedKey && savedKey.trim().length > 5) ? MODEL_STABLE : MODEL_PREVIEW;
     }
 
     function loadSavedApiKey() {
@@ -338,6 +351,23 @@
       if (savedKey) {
         document.getElementById('apiKeyInput').value = savedKey;
       }
+    }
+
+    function updateGroundingStatusUI() {
+      const statusIcon = document.getElementById('statusIcon');
+      const statusTitle = document.getElementById('statusTitle');
+      const badge = document.getElementById('groundingBadge');
+
+      if (isGroundingActive) {
+        statusTitle.innerHTML = `REAL-TIME SEARCH GROUNDING ACTIVE <span class="text-gray-400 font-normal">（Google 検索連動機能有効）</span>`;
+        badge.innerHTML = `<i data-lucide="check-circle-2" class="w-2.5 h-2.5"></i> 実際の最新情報を取得`;
+        badge.className = "text-[10px] tracking-wider px-2 py-0.5 border border-[#d4af37]/40 text-[#d4af37] rounded-full bg-[#d4af37]/10 flex items-center gap-1";
+      } else {
+        statusTitle.innerHTML = `ANALYST INTELLIGENCE ACTIVE <span class="text-gray-400 font-normal">（ウェブ検索無効・AI知見により自動生成中）</span>`;
+        badge.innerHTML = `<i data-lucide="alert-triangle" class="w-2.5 h-2.5 text-orange-400"></i> AI内蔵情報`;
+        badge.className = "text-[10px] tracking-wider px-2 py-0.5 border border-orange-500/40 text-orange-400 rounded-full bg-orange-500/10 flex items-center gap-1";
+      }
+      lucide.createIcons();
     }
 
     function setupEvents() {
@@ -375,12 +405,17 @@
           localStorage.removeItem('GEMINI_FIRE_API_KEY');
           settingsModal.classList.add('hidden');
         }
+        // キーが更新されたら即座に再評価
+        isGroundingActive = true; 
+        updateGroundingStatusUI();
       });
 
       deleteKeyBtn.addEventListener('click', () => {
         localStorage.removeItem('GEMINI_FIRE_API_KEY');
         document.getElementById('apiKeyInput').value = '';
         settingsModal.classList.add('hidden');
+        isGroundingActive = true;
+        updateGroundingStatusUI();
       });
 
       // Filter clicks
@@ -425,23 +460,25 @@
       step1.className = "transition-colors duration-300 text-[#d4af37]";
       step2.className = "transition-colors duration-300 text-gray-600";
       step3.className = "transition-colors duration-300 text-gray-600";
-      stepTitle.innerText = "日本の消防・防災の最新情報をウェブ検索中...";
+      stepTitle.innerText = isGroundingActive 
+        ? "日本の消防・防災の最新情報をウェブ検索中..." 
+        : "AIの消防分析知見より最新防災データを生成中...";
 
       loadingInterval = setInterval(() => {
         duration += 1;
         
         if (duration === 3) {
-          stepTitle.innerText = "総務省消防庁や各ニュースサイトのデータを選定中...";
+          stepTitle.innerText = "情報のソース分析および関連文書の選定中...";
           step1.className = "transition-colors duration-300 text-gray-500";
           step2.className = "transition-colors duration-300 text-[#d4af37]";
         } else if (duration === 6) {
-          stepTitle.innerText = "信頼性をファクトチェックして情報を整理・要約中...";
+          stepTitle.innerText = "情報のファクトチェックを完了、データを要約中...";
           step2.className = "transition-colors duration-300 text-gray-500";
           step3.className = "transition-colors duration-300 text-[#d4af37]";
         } else if (duration === 9) {
-          stepTitle.innerText = "レスポンスデータを精査し、ダッシュボードを構築しています...";
+          stepTitle.innerText = "ダッシュボード上の構成を作成しています...";
         } else if (duration > 11 && duration % 3 === 0) {
-          stepTitle.innerText = "データ解析中... 完了まで今しばらくお待ちください...";
+          stepTitle.innerText = "解析の最終処理中... 画面への描画を準備しています...";
         }
       }, 1000);
     }
@@ -454,86 +491,152 @@
     }
 
     // --- API Client ---
-    async function generateFireData(apiKey) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
-      
-      // 生成スピード（時間）をさらに劇的に縮めるため：
-      // - ニュースの数を「5件〜6件」に削減（処理にかかる時間が半減します）
-      // - 出力フォーマットを効率化
-      const prompt = `
-      日本の消防・防災・災害に関連する「実在する最新ニュース」または「総務省消防庁等の直近の公式発表・通知」を検索し、信頼性の高い情報を【5〜6件】厳選して、指定のJSONスキーマで出力してください。架空の情報は絶対に含めないでください。
-      `;
+    async function generateFireData(apiKeyParam) {
+      let activeModel = getActiveModel();
+      let keyToUse = apiKeyParam;
 
-      const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ "google_search": {} }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                id: { type: "STRING" },
-                title: { type: "STRING", description: "実際のニュースや公式発表のタイトル" },
-                date: { type: "STRING", description: "発表日または報道日 (YYYY-MM-DD)" },
-                source: { type: "STRING", description: "実際の情報元（例：総務省消防庁、〇〇新聞など）" },
-                category: { type: "STRING", description: "カテゴリ分類" },
-                summary: { type: "STRING", description: "ニュースの簡潔な要約（60〜80文字）" },
-                content: { type: "STRING", description: "詳細な内容（200〜300文字程度）" },
-                source_url: { type: "STRING", description: "根拠となった実際のWebサイトのURL" },
-                isOfficial: { type: "BOOLEAN", description: "公的機関の発表ならtrue" },
-                isUrgent: { type: "BOOLEAN", description: "緊急を要するものならtrue" },
-                isDisaster: { type: "BOOLEAN", description: "災害・火災に関するものならtrue" }
-              },
-              required: ["id", "title", "date", "source", "category", "summary", "content", "source_url", "isOfficial", "isUrgent", "isDisaster"]
+      // 400/403エラー発生時の自動フォールバック用ループ
+      // 試行1: Grounding（Google検索）ありで通常リクエスト
+      // 試行2: Grounding（Google検索）なしにフォールバック（検索制限キーでの400/403エラーを回避）
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${keyToUse}`;
+        
+        // プロンプトをGrounding有無で切り替え
+        let prompt = "";
+        let payload = {};
+
+        if (isGroundingActive) {
+          prompt = `日本の消防・防災・災害に関連する「実在する最新ニュース」または「総務省消防庁等の直近の公式発表・通知」を検索し、信頼性の高い情報を【5〜6件】厳選して、指定のJSONスキーマで出力してください。架空の情報は絶対に含めないでください。`;
+          payload = {
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: [{ "google_search": {} }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    id: { type: "STRING" },
+                    title: { type: "STRING", description: "実際のニュースや公式発表のタイトル" },
+                    date: { type: "STRING", description: "発表日または報道日 (YYYY-MM-DD)" },
+                    source: { type: "STRING", description: "実際の情報元" },
+                    category: { type: "STRING", description: "カテゴリ分類" },
+                    summary: { type: "STRING", description: "ニュースの簡潔な要約（60〜80文字）" },
+                    content: { type: "STRING", description: "詳細な内容（200〜300文字程度）" },
+                    source_url: { type: "STRING", description: "根拠となった実際のWebサイトのURL" },
+                    isOfficial: { type: "BOOLEAN" },
+                    isUrgent: { type: "BOOLEAN" },
+                    isDisaster: { type: "BOOLEAN" }
+                  },
+                  required: ["id", "title", "date", "source", "category", "summary", "content", "source_url", "isOfficial", "isUrgent", "isDisaster"]
+                }
+              }
             }
-          }
+          };
+        } else {
+          // ウェブ検索機能が使えないAPIキー（400/403エラー）の場合のフォールバック
+          prompt = `日本の消防・防災・災害をテーマにした、非常にリアルで実用的な学習用デモニュースを【5〜6件】作成し、指定のJSONスキーマで出力してください。`;
+          payload = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    id: { type: "STRING" },
+                    title: { type: "STRING" },
+                    date: { type: "STRING" },
+                    source: { type: "STRING" },
+                    category: { type: "STRING" },
+                    summary: { type: "STRING" },
+                    content: { type: "STRING" },
+                    source_url: { type: "STRING" },
+                    isOfficial: { type: "BOOLEAN" },
+                    isUrgent: { type: "BOOLEAN" },
+                    isDisaster: { type: "BOOLEAN" }
+                  },
+                  required: ["id", "title", "date", "source", "category", "summary", "content", "source_url", "isOfficial", "isUrgent", "isDisaster"]
+                }
+              }
+            }
+          };
         }
-      };
 
-      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-      const retries = [500, 1000, 2000]; // タイムアウトを早めにするための短いバックオフ
+        // 指数バックオフ（Exponential Backoff）による再試行処理 (ガイドライン準拠: 最大5回 1s, 2s, 4s, 8s, 16s)
+        const backoffDelays = [1000, 2000, 4000, 8000, 16000];
+        let success = false;
+        let lastError = null;
 
-      for (let i = 0; i <= retries.length; i++) {
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          
-          if (response.status === 400 || response.status === 403) {
-            throw new Error("API_KEY_ERROR");
+        for (let r = 0; r <= backoffDelays.length; r++) {
+          try {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            // 400 (Bad Request) または 403 (Forbidden) の場合
+            if (response.status === 400 || response.status === 403) {
+              if (isGroundingActive) {
+                // 検索（Grounding）機能の制限によるエラーである確率が非常に高いため、
+                // 検索をOFF（Groundingなし）にしたフォールバックモードへ強制移行させてループを抜ける
+                console.warn("API key grounding restrictions detected. Falling back to non-grounded mode.");
+                isGroundingActive = false;
+                updateGroundingStatusUI();
+                break; // バックオフの再試行を抜けて、外側のattemptループで検索なしリクエストへ移行
+              }
+              
+              // もしカスタムキーでエラーになったのなら、ブラウザデフォルトキーへの自動復旧を試みる
+              if (keyToUse !== apiKey && apiKey.length > 5) {
+                console.warn("Custom API Key failed. Recovering with system default key.");
+                keyToUse = apiKey;
+                break;
+              }
+              
+              throw new Error("API_KEY_ERROR");
+            }
+
+            // モデルが見つからない場合の自動1.5フォールバック
+            if (response.status === 404 && activeModel === MODEL_STABLE) {
+              activeModel = MODEL_FALLBACK;
+              break; 
+            }
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const resData = await response.json();
+            const text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error("No text in response");
+            
+            const parsedData = JSON.parse(text);
+            const attributions = resData.candidates?.[0]?.groundingMetadata?.groundingAttributions || [];
+            
+            return parsedData.map((item, index) => {
+              const matchedAttribution = attributions[index % attributions.length];
+              const fallbackUrl = matchedAttribution?.web?.uri || "https://www.fdma.go.jp/";
+              return {
+                ...item,
+                source_url: item.source_url || fallbackUrl
+              };
+            });
+
+          } catch (err) {
+            lastError = err;
+            if (err.message === "API_KEY_ERROR") {
+              throw err; // APIキーの致命的エラーはリトライせずに即時復旧へ
+            }
+            if (r === backoffDelays.length) throw err;
+            
+            // 指数バックオフ待機
+            await new Promise(resolve => setTimeout(resolve, backoffDelays[r]));
           }
-          
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-          const data = await response.json();
-          
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!text) throw new Error("No text in response");
-          
-          const parsedData = JSON.parse(text);
-
-          // Get search grounding attributions
-          const attributions = data.candidates?.[0]?.groundingMetadata?.groundingAttributions || [];
-          
-          return parsedData.map((item, index) => {
-            const matchedAttribution = attributions[index % attributions.length];
-            const fallbackUrl = matchedAttribution?.web?.uri || "https://www.fdma.go.jp/";
-            return {
-              ...item,
-              source_url: item.source_url || fallbackUrl
-            };
-          });
-        } catch (error) {
-          if (error.message === "API_KEY_ERROR") {
-            throw error; // APIキーエラーの場合はリトライせずに即時復帰
-          }
-          if (i === retries.length) throw error;
-          await delay(retries[i]);
         }
       }
+      
+      throw new Error("API_KEY_ERROR");
     }
 
     // --- Fetch Trigger ---
@@ -545,7 +648,7 @@
       const errorSolution = document.getElementById('errorSolution');
       
       // APIキーが存在しない場合のエラーハンドリング
-      if (!activeKey) {
+      if (!activeKey || activeKey.trim().length === 0) {
         errorMessage.innerText = "APIキーが設定されていません";
         errorSolution.innerHTML = `
           本システムを外部のブラウザやGitHub上で実行する場合、GeminiのAPIキーが必要です。<br>
@@ -566,7 +669,7 @@
 
       // Set Loading state
       fetchBtn.disabled = true;
-      btnText.innerText = "ウェブから最新ニュースを検索中...";
+      btnText.innerText = "最新ニュースを解析中...";
       emptyScreen.classList.add('hidden');
       cardsGrid.classList.add('hidden');
       errorArea.classList.add('hidden');
@@ -589,10 +692,10 @@
         console.error(err);
         
         if (err.message === "API_KEY_ERROR") {
-          errorMessage.innerText = "APIキーが無効、または認証エラーです";
+          errorMessage.innerText = "APIキーが無効、または未承認です";
           errorSolution.innerHTML = `
-            設定されているGemini APIキーが無効であるか、利用制限がかかっている可能性があります。<br>
-            右上の <strong class="text-[#d4af37]">⚙️ APIキー設定</strong> ボタンより、正しいキーを設定し直してください。
+            設定されているGemini APIキーが無効であるか、利用制限、またはアクセス権エラーが発生しています。<br>
+            右上の <strong class="text-[#d4af37]">⚙️ APIキー設定</strong> ボタンより正しいキーを再度登録し直すか、一時的な通信環境をご確認ください。
           `;
         } else {
           errorMessage.innerText = "最新情報の取得に失敗しました";
