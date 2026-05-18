@@ -165,6 +165,12 @@
       
       <!-- 本部用ツールボタン群 -->
       <div id="hq-tools" class="absolute top-2 right-2 z-[400] flex flex-col space-y-2 hidden">
+        <button id="btn-my-location-hq" class="bg-white p-2 rounded shadow-md border border-gray-300 hover:bg-gray-100 text-blue-600 font-bold" title="現在地に戻る">
+          📍 現在地
+        </button>
+        <button id="btn-reconnect-gps-hq" class="bg-white p-2 rounded shadow-md border border-green-300 text-green-600 hover:bg-green-50 font-bold" title="GPSの再取得">
+          🛰️ 再接続
+        </button>
         <button id="btn-show-qr" class="bg-white p-2 rounded shadow-md border border-gray-300 hover:bg-gray-100" title="QRコードを表示">
           📱 追加
         </button>
@@ -929,18 +935,21 @@
       membersPanel.classList.add('translate-x-full');
     });
 
-    // 現在地に戻る (現場)
+    // 現在地に戻る (現場・本部共通)
     document.getElementById('btn-my-location').addEventListener('click', () => {
       if (markers[currentUser.uid]) {
         map.setView(markers[currentUser.uid].getLatLng(), 16);
       }
     });
+    document.getElementById('btn-my-location-hq').addEventListener('click', () => {
+      if (markers[currentUser.uid]) {
+        map.setView(markers[currentUser.uid].getLatLng(), 16);
+      }
+    });
 
-    // ★追加：GPS手動再接続機能 (現場)
-    document.getElementById('btn-reconnect-gps').addEventListener('click', () => {
-      if (currentRole !== 'field') return;
-      
-      const btn = document.getElementById('btn-reconnect-gps');
+    // ★追加・修正：GPS手動再接続機能 (現場・本部共通化)
+    function handleReconnectGPS(btnId) {
+      const btn = document.getElementById(btnId);
       const originalText = btn.innerHTML;
       btn.innerHTML = '⏳ 接続中';
       
@@ -951,12 +960,19 @@
       setTimeout(() => {
         btn.innerHTML = originalText;
       }, 2000);
+    }
+
+    document.getElementById('btn-reconnect-gps').addEventListener('click', () => {
+      if (currentRole === 'field') handleReconnectGPS('btn-reconnect-gps');
+    });
+    document.getElementById('btn-reconnect-gps-hq').addEventListener('click', () => {
+      if (currentRole === 'hq') handleReconnectGPS('btn-reconnect-gps-hq');
     });
 
-    // ★追加：スリープ復帰時の自動再接続機能
+    // ★追加・修正：スリープ復帰時の自動再接続機能 (現場・本部共通化)
     document.addEventListener("visibilitychange", () => {
-      // 画面が再び表示され、かつ現場隊員として活動中の場合
-      if (document.visibilityState === "visible" && currentRole === 'field') {
+      // 画面が再び表示され、かつ活動中の場合（本部・現場問わず）
+      if (document.visibilityState === "visible" && (currentRole === 'field' || currentRole === 'hq')) {
         startGPS(); // GPS監視を裏側で再起動
       }
     });
