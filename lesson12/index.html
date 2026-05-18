@@ -63,6 +63,17 @@
 
   <div class="max-w-6xl mx-auto px-4 py-12 flex flex-col gap-10">
     
+    <!-- Top Bar with Settings button -->
+    <div class="flex justify-end items-center -mb-6">
+      <button 
+        id="settingsBtn"
+        class="inline-flex items-center gap-2 px-4 py-2 border border-[#d4af37]/30 hover:border-[#d4af37] text-[#c9b168] bg-black/40 text-xs tracking-wider transition-all rounded-sm"
+      >
+        <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+        <span>⚙️ APIキー設定</span>
+      </button>
+    </div>
+
     <!-- Header Section -->
     <header class="flex flex-col items-center text-center gap-6">
       <div class="inline-flex items-center gap-3 px-6 py-2 border border-[#d4af37]/40 rounded-sm bg-black/40">
@@ -98,7 +109,7 @@
         </span>
       </div>
       <p class="text-sm leading-loose text-gray-400 font-light tracking-wide">
-        このダッシュボードは、消防法、災害ニュース、総務省消防庁の公式データを、GeminiのGoogle検索グラウンディング機能を用いてインターネット上からリアルタイムに収集しています。出力結果には実際のニュースサイトや官公庁ホームページのURLが参照元としてリンクされます。
+        このダッシュボードは、消防法、災害ニュース、総務省消防庁の公式データを、GeminiのGoogle検索グラウンディング機能を用いてインターネット上からリアルタイムに収集しています。外部のパソコン等からご利用の際は、右上の「APIキー設定」より、ご自身のGemini APIキーを入力して保存してください。
       </p>
     </section>
 
@@ -163,9 +174,12 @@
     <!-- Main Content Area -->
     <main class="min-h-[400px] border-t border-[#d4af37]/20 pt-10">
       <!-- Error Message -->
-      <div id="errorArea" class="hidden p-4 border border-red-900/50 bg-red-950/20 text-red-400 text-sm flex items-center gap-3 mb-6">
-        <i data-lucide="alert-triangle" class="w-4 h-4"></i>
-        <span id="errorMessage"></span>
+      <div id="errorArea" class="hidden p-6 border border-red-900/50 bg-red-950/20 text-red-400 text-sm flex flex-col gap-3 mb-6 rounded-sm">
+        <div class="flex items-center gap-3">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400"></i>
+          <span id="errorMessage" class="font-bold text-base">エラーが発生しました</span>
+        </div>
+        <p id="errorSolution" class="text-xs text-gray-400 pl-8 leading-relaxed"></p>
       </div>
 
       <!-- Empty / Guide Screen -->
@@ -176,7 +190,7 @@
         <div class="text-center space-y-3">
           <p class="text-sm tracking-widest text-gray-400">「実際の最新情報を検索・収集する」ボタンを押すと</p>
           <p class="text-sm tracking-widest text-gray-400">Googleのリアルタイム検索結果から本物の消防関連ニュースを整理して表示します。</p>
-          <p class="text-xs text-gray-600 mt-2 tracking-widest">総務省消防庁や各自治体の最新発表、ニュース速報などが動的に取得されます。</p>
+          <p class="text-xs text-gray-600 mt-2 tracking-widest">※ 外部環境や別PCで動かすには、右上のボタンからAPIキーの設定が必要です。</p>
         </div>
       </div>
 
@@ -206,6 +220,46 @@
       <!-- Cards Grid container -->
       <div id="cardsGrid" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10"></div>
     </main>
+  </div>
+
+  <!-- Settings / API Key Modal -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+    <div class="bg-[#111] border border-[#d4af37]/40 w-full max-w-md p-6 relative rounded-sm shadow-2xl shadow-black">
+      <div class="flex justify-between items-center border-b border-[#d4af37]/20 pb-4 mb-6">
+        <span class="text-sm font-medium tracking-widest text-[#d4af37] font-cinzel flex items-center gap-2">
+          <i data-lucide="settings" class="w-4 h-4"></i> GEMINI API KEY CONFIGURATION
+        </span>
+        <button id="closeSettingsBtn" class="text-gray-500 hover:text-white transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-sm">
+        <p class="text-gray-400 text-xs leading-relaxed">
+          別PCのブラウザやGitHub Pages上で本ダッシュボードを使用する場合、Google検索連携を動作させるためにご自身のGemini APIキーが必要です。
+        </p>
+        <div>
+          <label class="block text-xs text-[#c9b168] tracking-widest mb-2 font-bold">GEMINI API KEY</label>
+          <input 
+            type="password" 
+            id="apiKeyInput" 
+            placeholder="AIzaSy..." 
+            class="w-full bg-black/60 border border-[#d4af37]/30 focus:border-[#d4af37] outline-none px-4 py-3 text-white text-sm tracking-wider font-mono rounded-sm"
+          >
+        </div>
+        <p class="text-[11px] text-gray-500 leading-normal">
+          ※ キーは外部サーバーには送信されず、あなたのブラウザのローカルストレージにのみ保存されます。キーをお持ちでない場合は、<a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" class="text-[#d4af37] underline">Google AI Studio</a> より数分で無料取得できます。
+        </p>
+        <div class="flex justify-end gap-3 pt-4 border-t border-white/5">
+          <button id="deleteKeyBtn" class="px-4 py-2 text-xs border border-red-500/30 hover:border-red-500 text-red-400 transition-colors bg-transparent rounded-sm">
+            キーを消去
+          </button>
+          <button id="saveKeyBtn" class="px-6 py-2 text-xs bg-[#d4af37]/20 hover:bg-[#d4af37]/30 text-[#d4af37] border border-[#d4af37]/40 hover:border-[#d4af37] transition-all rounded-sm font-bold">
+            保存する
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Modal for Details with Source Links -->
@@ -258,7 +312,7 @@
 
   <!-- Core JavaScript for API and UI rendering -->
   <script>
-    const API_KEY = ""; // Gemini API Key will be injected here
+    const API_KEY_ENV = ""; // Canvas environment default key
     const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
 
     // Application state
@@ -267,16 +321,67 @@
     let fetchCount = 0;
     let loadingInterval = null;
 
-    // Initialize Lucide Icons
+    // Load API Key on Startup
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       setupEvents();
+      loadSavedApiKey();
     });
+
+    function getActiveApiKey() {
+      const savedKey = localStorage.getItem('GEMINI_FIRE_API_KEY');
+      return savedKey || API_KEY_ENV;
+    }
+
+    function loadSavedApiKey() {
+      const savedKey = localStorage.getItem('GEMINI_FIRE_API_KEY');
+      if (savedKey) {
+        document.getElementById('apiKeyInput').value = savedKey;
+      }
+    }
 
     function setupEvents() {
       // Fetch button click
       const fetchBtn = document.getElementById('fetchBtn');
       fetchBtn.addEventListener('click', handleFetchData);
+
+      // Settings Modal Control
+      const settingsBtn = document.getElementById('settingsBtn');
+      const settingsModal = document.getElementById('settingsModal');
+      const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+      const saveKeyBtn = document.getElementById('saveKeyBtn');
+      const deleteKeyBtn = document.getElementById('deleteKeyBtn');
+
+      settingsBtn.addEventListener('click', () => {
+        settingsModal.classList.remove('hidden');
+      });
+
+      closeSettingsBtn.addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+      });
+
+      settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) {
+          settingsModal.classList.add('hidden');
+        }
+      });
+
+      saveKeyBtn.addEventListener('click', () => {
+        const key = document.getElementById('apiKeyInput').value.trim();
+        if (key) {
+          localStorage.setItem('GEMINI_FIRE_API_KEY', key);
+          settingsModal.classList.add('hidden');
+        } else {
+          localStorage.removeItem('GEMINI_FIRE_API_KEY');
+          settingsModal.classList.add('hidden');
+        }
+      });
+
+      deleteKeyBtn.addEventListener('click', () => {
+        localStorage.removeItem('GEMINI_FIRE_API_KEY');
+        document.getElementById('apiKeyInput').value = '';
+        settingsModal.classList.add('hidden');
+      });
 
       // Filter clicks
       const filterButtons = document.querySelectorAll('#filterContainer button');
@@ -325,18 +430,18 @@
       loadingInterval = setInterval(() => {
         duration += 1;
         
-        if (duration === 4) {
+        if (duration === 3) {
           stepTitle.innerText = "総務省消防庁や各ニュースサイトのデータを選定中...";
           step1.className = "transition-colors duration-300 text-gray-500";
           step2.className = "transition-colors duration-300 text-[#d4af37]";
-        } else if (duration === 8) {
+        } else if (duration === 6) {
           stepTitle.innerText = "信頼性をファクトチェックして情報を整理・要約中...";
           step2.className = "transition-colors duration-300 text-gray-500";
           step3.className = "transition-colors duration-300 text-[#d4af37]";
-        } else if (duration === 12) {
+        } else if (duration === 9) {
           stepTitle.innerText = "レスポンスデータを精査し、ダッシュボードを構築しています...";
-        } else if (duration > 15 && duration % 5 === 0) {
-          stepTitle.innerText = "データ解析完了間近です。ブラウザ描画を準備しています...";
+        } else if (duration > 11 && duration % 3 === 0) {
+          stepTitle.innerText = "データ解析中... 完了まで今しばらくお待ちください...";
         }
       }, 1000);
     }
@@ -349,15 +454,14 @@
     }
 
     // --- API Client ---
-    async function generateFireData() {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+    async function generateFireData(apiKey) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
       
-      // より検索ノイズを減らし、AIがスムーズに回答を出せるようにプロンプトを整理・最適化
+      // 生成スピード（時間）をさらに劇的に縮めるため：
+      // - ニュースの数を「5件〜6件」に削減（処理にかかる時間が半減します）
+      // - 出力フォーマットを効率化
       const prompt = `
-      日本の直近の消防、防災、災害関連の「実際の最新ニュース」や「総務省消防庁の公式発表・通知」をGoogle検索から数件抽出して整理してください。
-      架空の情報ではなく、現実にニュース報道や官公庁発表として存在する内容を要約して出力してください。
-      
-      出力は必ず指定のJSONスキーマに従う配列形式とし、それ以外の文章は一切含めないでください。
+      日本の消防・防災・災害に関連する「実在する最新ニュース」または「総務省消防庁等の直近の公式発表・通知」を検索し、信頼性の高い情報を【5〜6件】厳選して、指定のJSONスキーマで出力してください。架空の情報は絶対に含めないでください。
       `;
 
       const payload = {
@@ -373,14 +477,14 @@
                 id: { type: "STRING" },
                 title: { type: "STRING", description: "実際のニュースや公式発表のタイトル" },
                 date: { type: "STRING", description: "発表日または報道日 (YYYY-MM-DD)" },
-                source: { type: "STRING", description: "実際の情報元（例：総務省消防庁、〇〇市消防局、共同通信など）" },
+                source: { type: "STRING", description: "実際の情報元（例：総務省消防庁、〇〇新聞など）" },
                 category: { type: "STRING", description: "カテゴリ分類" },
-                summary: { type: "STRING", description: "ニュースの簡潔な要約（80文字程度）" },
-                content: { type: "STRING", description: "ニュースの詳細な内容（250〜350文字程度で具体的に記載してください）" },
-                source_url: { type: "STRING", description: "情報の根拠となった実際のWebサイトやニュースのURL（無ければ主要な参照先URL）" },
-                isOfficial: { type: "BOOLEAN", description: "省庁や自治体の公式発表であればtrue" },
-                isUrgent: { type: "BOOLEAN", description: "現在進行中や緊急度が高いものならtrue" },
-                isDisaster: { type: "BOOLEAN", description: "火災、大雨、地震などの災害情報ならtrue" }
+                summary: { type: "STRING", description: "ニュースの簡潔な要約（60〜80文字）" },
+                content: { type: "STRING", description: "詳細な内容（200〜300文字程度）" },
+                source_url: { type: "STRING", description: "根拠となった実際のWebサイトのURL" },
+                isOfficial: { type: "BOOLEAN", description: "公的機関の発表ならtrue" },
+                isUrgent: { type: "BOOLEAN", description: "緊急を要するものならtrue" },
+                isDisaster: { type: "BOOLEAN", description: "災害・火災に関するものならtrue" }
               },
               required: ["id", "title", "date", "source", "category", "summary", "content", "source_url", "isOfficial", "isUrgent", "isDisaster"]
             }
@@ -389,7 +493,7 @@
       };
 
       const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-      const retries = [1000, 2000, 4000, 8000, 16000]; // 規定の指数バックオフ間隔
+      const retries = [500, 1000, 2000]; // タイムアウトを早めにするための短いバックオフ
 
       for (let i = 0; i <= retries.length; i++) {
         try {
@@ -398,6 +502,10 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
+          
+          if (response.status === 400 || response.status === 403) {
+            throw new Error("API_KEY_ERROR");
+          }
           
           if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const data = await response.json();
@@ -419,6 +527,9 @@
             };
           });
         } catch (error) {
+          if (error.message === "API_KEY_ERROR") {
+            throw error; // APIキーエラーの場合はリトライせずに即時復帰
+          }
           if (i === retries.length) throw error;
           await delay(retries[i]);
         }
@@ -427,6 +538,24 @@
 
     // --- Fetch Trigger ---
     async function handleFetchData() {
+      const activeKey = getActiveApiKey();
+      
+      const errorArea = document.getElementById('errorArea');
+      const errorMessage = document.getElementById('errorMessage');
+      const errorSolution = document.getElementById('errorSolution');
+      
+      // APIキーが存在しない場合のエラーハンドリング
+      if (!activeKey) {
+        errorMessage.innerText = "APIキーが設定されていません";
+        errorSolution.innerHTML = `
+          本システムを外部のブラウザやGitHub上で実行する場合、GeminiのAPIキーが必要です。<br>
+          画面右上にある <strong class="text-[#d4af37]">⚙️ APIキー設定</strong> ボタンを押し、ご自身のキーを設定した上で再度検索を実行してください。
+        `;
+        errorArea.classList.remove('hidden');
+        window.scrollTo({ top: errorArea.offsetTop - 50, behavior: 'smooth' });
+        return;
+      }
+
       const fetchBtn = document.getElementById('fetchBtn');
       const btnText = document.getElementById('btnText');
       const btnIcon = document.getElementById('btnIcon');
@@ -434,7 +563,6 @@
       const emptyScreen = document.getElementById('emptyScreen');
       const loadingScreen = document.getElementById('loadingScreen');
       const cardsGrid = document.getElementById('cardsGrid');
-      const errorArea = document.getElementById('errorArea');
 
       // Set Loading state
       fetchBtn.disabled = true;
@@ -448,7 +576,7 @@
       startLoadingAnimation();
 
       try {
-        const result = await generateFireData();
+        const result = await generateFireData(activeKey);
         dataState = result;
         fetchCount++;
         
@@ -459,10 +587,25 @@
         cardsGrid.classList.remove('hidden');
       } catch (err) {
         console.error(err);
-        document.getElementById('errorMessage').innerText = "最新情報の取得に失敗しました。一時的に通信が混雑しているか、検索がタイムアウトした可能性があります。少し時間を置いてから再度お試しください。";
+        
+        if (err.message === "API_KEY_ERROR") {
+          errorMessage.innerText = "APIキーが無効、または認証エラーです";
+          errorSolution.innerHTML = `
+            設定されているGemini APIキーが無効であるか、利用制限がかかっている可能性があります。<br>
+            右上の <strong class="text-[#d4af37]">⚙️ APIキー設定</strong> ボタンより、正しいキーを設定し直してください。
+          `;
+        } else {
+          errorMessage.innerText = "最新情報の取得に失敗しました";
+          errorSolution.innerHTML = `
+            通信中にエラーが発生したか、API制限（タイムアウト、混雑、キーの残高不足など）に達した可能性があります。<br>
+            少し時間をおいてから再度お試しいただくか、右上の設定からAPIキーが正しいかご確認ください。
+          `;
+        }
+        
         errorArea.classList.remove('hidden');
         loadingScreen.classList.add('hidden');
         emptyScreen.classList.remove('hidden');
+        window.scrollTo({ top: errorArea.offsetTop - 50, behavior: 'smooth' });
       } finally {
         stopLoadingAnimation();
         fetchBtn.disabled = false;
