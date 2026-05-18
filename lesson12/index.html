@@ -1,0 +1,464 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  SquareTerminal, 
+  Terminal, 
+  Search, 
+  Loader2, 
+  AlertTriangle, 
+  Building2, 
+  Flame, 
+  Activity,
+  ExternalLink,
+  X,
+  Globe,
+  CheckCircle2
+} from 'lucide-react';
+
+const API_KEY = ""; // Gemini API Key will be injected here
+const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+
+// --- API Client ---
+const generateFireData = async () => {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+  
+  // 実際の情報をGoogle検索から見つけるためのプロンプト
+  const prompt = `
+  あなたは消防・防災情報の専門アナリストです。
+  Google検索を利用して、日本の消防・防災・災害に関連する「実際の最新ニュース」や「総務省消防庁等の公式発表・通知」を収集・整理してください。架空の情報ではなく、現実に報道されているニュースや公式文書に基づいた情報を整理してください。
+  特に本日（2026年5月18日前後）の最新情報や、ここ最近の重要な発表を優先してください。
+  
+  【収集対象の優先順位】
+  1. 総務省消防庁の公式発表・通知・報告書
+  2. 大規模火災・林野火災・自然災害のリアルタイムニュース
+  3. 消防法改正・規制変更に関する直近の動き
+  4. 防火・防災の行政施策や注意喚起情報
+  5. 消防技術・設備の最新動向
+  
+  集めた最新情報を8〜10件、必ず指定のJSONスキーマに従って整理・変換して出力してください。
+  `;
+
+  // google_search ツールをペイロードに組み込み、リアルタイム検索を可能にします
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    tools: [{ "google_search": {} }], // Google 検索グラウンディングを有効化
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            id: { type: "STRING" },
+            title: { type: "STRING", description: "実際のニュースや公式発表のタイトル" },
+            date: { type: "STRING", description: "発表日または報道日 (YYYY-MM-DD)" },
+            source: { type: "STRING", description: "実際の情報元 (例: 総務省消防庁、〇〇市消防局、〇〇新聞)" },
+            category: { type: "STRING", description: "カテゴリ (公式発表・通知・報告書, 大規模火災・林野火災, 消防法改正・規制変更, 防火・防災の行政施策, 消防技術・設備の最新動向 など)" },
+            summary: { type: "STRING", description: "ニュースの簡潔な要約(80文字程度)" },
+            content: { type: "STRING", description: "ニュースの詳細な本文（300文字程度。実際の経緯や数値、対策などを交えて具体的に記載してください）" },
+            source_url: { type: "STRING", description: "情報の根拠となった実際のWebサイトやニュースソースのURL（検索結果のURL）" },
+            isOfficial: { type: "BOOLEAN", description: "官公庁（消防庁、自治体など）の公式発表である場合はtrue、一般のニュースメディアはfalse" },
+            isUrgent: { type: "BOOLEAN", description: "現在進行中の緊急事態や直近の重大な警戒情報（大雨特別警報、大規模延焼中の火災など）の場合はtrue" },
+            isDisaster: { type: "BOOLEAN", description: "火災、地震、台風、大雨など、実際の災害発生または警戒情報に関するものはtrue" }
+          },
+          required: ["id", "title", "date", "source", "category", "summary", "content", "source_url", "isOfficial", "isUrgent", "isDisaster"]
+        }
+      }
+    }
+  };
+
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const retries = [1000, 2000, 4000, 8000, 16000];
+
+  for (let i = 0; i <= retries.length; i++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      
+      // テキスト部分の抽出
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("No text in response");
+      
+      const parsedData = JSON.parse(text);
+
+      // グラウンディング情報の抽出（URLの補完）
+      const attributions = data.candidates?.[0]?.groundingMetadata?.groundingAttributions || [];
+      
+      // もし個別のニュースに source_url が設定されていなかった場合のフォールバックとして検索ソースを付与
+      const enhancedData = parsedData.map((item, index) => {
+        // グラウンディングURLがある場合、それをセット
+        const matchedAttribution = attributions[index % attributions.length];
+        const fallbackUrl = matchedAttribution?.web?.uri || "https://www.fdma.go.jp/";
+        return {
+          ...item,
+          source_url: item.source_url || fallbackUrl
+        };
+      });
+
+      return enhancedData;
+    } catch (error) {
+      if (i === retries.length) throw error;
+      await delay(retries[i]);
+    }
+  }
+};
+
+// --- Main Application ---
+export default function App() {
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState([]);
+  const [error, setError] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [stats, setStats] = useState({ fetches: 0 });
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  const handleFetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await generateFireData();
+      setData(result);
+      setStats(prev => ({ ...prev, fetches: prev.fetches + 1 }));
+      setFilter('all');
+    } catch (err) {
+      console.error(err);
+      setError("最新情報の取得に失敗しました。時間をおいて再度お試しください。");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredData = data.filter(item => {
+    if (filter === 'all') return true;
+    if (filter === 'official') return item.isOfficial;
+    if (filter === 'urgent') return item.isUrgent;
+    if (filter === 'disaster') return item.isDisaster;
+    return true;
+  });
+
+  const currentStats = {
+    total: data.length,
+    official: data.filter(d => d.isOfficial).length,
+    urgent: data.filter(d => d.isUrgent).length,
+    fetches: stats.fetches
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-gray-300 font-serif selection:bg-[#d4af37]/30">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;700&family=Cinzel:wght@400;600&display=swap');
+        
+        body { font-family: 'Noto Serif JP', serif; }
+        .font-cinzel { font-family: 'Cinzel', serif; }
+        
+        .gold-gradient {
+          background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.5), transparent);
+        }
+        
+        .glass-panel {
+          background: rgba(20, 20, 20, 0.7);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(212, 175, 55, 0.15);
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(0,0,0,0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(212, 175, 55, 0.3);
+          border-radius: 3px;
+        }
+      `}</style>
+
+      <div className="max-w-6xl mx-auto px-4 py-12 flex flex-col gap-10">
+        
+        {/* Header Section */}
+        <header className="flex flex-col items-center text-center gap-6">
+          <div className="inline-flex items-center gap-3 px-6 py-2 border border-[#d4af37]/40 rounded-sm bg-black/40">
+            <SquareTerminal size={14} className="text-[#d4af37]" />
+            <span className="text-xs tracking-[0.2em] text-[#c9b168]">
+              消防情報収集システム — <span className="font-cinzel">PROFESSIONAL EDITION</span>
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            <h1 className="text-4xl md:text-5xl font-medium tracking-widest text-white">
+              消防<span className="text-[#d4af37]">情報</span>ダッシュボード
+            </h1>
+            <p className="text-xs md:text-sm tracking-[0.3em] text-gray-500 font-cinzel">
+              REAL-TIME FIRE & DISASTER INTELLIGENCE — POWERED BY GEMINI SEARCH GROUNDING
+            </p>
+          </div>
+
+          <div className="w-full max-w-2xl h-px gold-gradient mt-2 opacity-50" />
+        </header>
+
+        {/* Prompt Recommendation Section */}
+        <section className="glass-panel p-6 rounded-sm border-[#d4af37]/30 bg-gradient-to-r from-black/60 to-[#d4af37]/5">
+          <div className="flex justify-between items-center flex-wrap gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Globe size={16} className="text-[#d4af37] animate-pulse" />
+              <h2 className="text-xs tracking-widest text-[#d4af37] font-semibold">
+                REAL-TIME SEARCH GROUNDING ACTIVE <span className="text-gray-400 font-normal">（Google 検索連動機能有効）</span>
+              </h2>
+            </div>
+            <span className="text-[10px] tracking-wider px-2 py-0.5 border border-[#d4af37]/40 text-[#d4af37] rounded-full bg-[#d4af37]/10 flex items-center gap-1">
+              <CheckCircle2 size={10} /> 実際の最新情報を取得
+            </span>
+          </div>
+          <p className="text-sm leading-loose text-gray-400 font-light tracking-wide">
+            このダッシュボードは、消防法、災害ニュース、総務省消防庁の公式データを、GeminiのGoogle検索グラウンディング機能を用いてインターネット上からリアルタイムに収集しています。出力結果には実際のニュースサイトや官公庁ホームページのURLが参照元としてリンクされます。
+          </p>
+        </section>
+
+        {/* Control Panel */}
+        <section className="flex flex-col md:flex-row justify-between items-center gap-6">
+          <button 
+            onClick={handleFetchData}
+            disabled={loading}
+            className="group relative flex items-center gap-3 px-8 py-4 bg-[#111] border border-[#d4af37]/50 hover:border-[#d4af37] hover:bg-[#1a1a1a] transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="absolute inset-0 bg-[#d4af37]/5 w-0 group-hover:w-full transition-all duration-500 ease-out" />
+            {loading ? (
+              <Loader2 size={20} className="text-[#d4af37] animate-spin relative z-10" />
+            ) : (
+              <Globe size={20} className="text-[#d4af37] group-hover:scale-110 transition-transform relative z-10" />
+            )}
+            <span className="text-sm tracking-widest text-white relative z-10 font-bold">
+              {loading ? 'ウェブから最新ニュースを検索中...' : '実際の最新情報を検索・収集する'}
+            </span>
+          </button>
+
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'all', label: 'すべて' },
+              { id: 'official', label: '公式発表' },
+              { id: 'urgent', label: '緊急警戒' },
+              { id: 'disaster', label: '災害・火災' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setFilter(tab.id)}
+                className={`px-6 py-3 text-xs tracking-widest transition-all border ${
+                  filter === tab.id 
+                    ? 'border-[#d4af37] text-[#d4af37] bg-[#d4af37]/10' 
+                    : 'border-white/10 text-gray-500 hover:border-white/30 hover:text-gray-300 bg-transparent'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Statistics Cards */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard title="収集件数" value={currentStats.total} unit="件" active={currentStats.total > 0} />
+          <StatCard title="公式発表情報" value={currentStats.official} unit="件" active={filter === 'official' || currentStats.official > 0} highlight />
+          <StatCard title="緊急・アラート" value={currentStats.urgent} unit="件" active={filter === 'urgent' || currentStats.urgent > 0} alert />
+          <StatCard title="検索実行回数" value={currentStats.fetches} unit="回" active={currentStats.fetches > 0} />
+        </section>
+
+        {/* Main Content Area */}
+        <main className="min-h-[400px] border-t border-[#d4af37]/20 pt-10">
+          {error && (
+            <div className="p-4 border border-red-900/50 bg-red-950/20 text-red-400 text-sm flex items-center gap-3 mb-6">
+              <AlertTriangle size={16} />
+              {error}
+            </div>
+          )}
+
+          {data.length === 0 && !loading && !error && (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-600 gap-6 opacity-80">
+              <div className="w-16 h-16 border border-[#d4af37]/30 flex items-center justify-center rounded-sm bg-black/40">
+                <Globe size={24} className="text-[#d4af37]" />
+              </div>
+              <div className="text-center space-y-3">
+                <p className="text-sm tracking-widest text-gray-400">「実際の最新情報を検索・収集する」ボタンを押すと</p>
+                <p className="text-sm tracking-widest text-gray-400">Googleのリアルタイム検索結果から本物の消防関連ニュースを整理して表示します。</p>
+                <p className="text-xs text-gray-600 mt-2 tracking-widest">総務省消防庁や各自治体の最新発表、ニュース速報などが動的に取得されます。</p>
+              </div>
+            </div>
+          )}
+
+          {loading && data.length === 0 && (
+             <div className="flex flex-col items-center justify-center h-64 text-[#d4af37] gap-4">
+               <Loader2 className="animate-spin text-[#d4af37]" size={36} />
+               <p className="text-xs tracking-[0.2em] animate-pulse">CONNECTING TO GOOGLE SEARCH ENGINE...</p>
+               <p className="text-xs text-gray-500 tracking-wider">日本の直近のニュース・発表資料を検索し、信頼情報をまとめています</p>
+             </div>
+          )}
+
+          {filteredData.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 custom-scrollbar pb-10">
+              {filteredData.map((item, idx) => (
+                <div key={item.id || idx} className="glass-panel p-6 flex flex-col gap-4 group hover:border-[#d4af37]/40 transition-colors">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="text-[10px] tracking-wider px-2 py-1 border border-white/20 text-gray-400">
+                        {item.date}
+                      </span>
+                      {item.isOfficial && (
+                        <span className="text-[10px] tracking-wider px-2 py-1 border border-[#d4af37]/50 text-[#d4af37] flex items-center gap-1 bg-[#d4af37]/10">
+                          <Building2 size={10} /> 公式発表
+                        </span>
+                      )}
+                      {item.isUrgent && (
+                        <span className="text-[10px] tracking-wider px-2 py-1 border border-red-500/50 text-red-400 flex items-center gap-1 bg-red-500/10 animate-pulse">
+                          <AlertTriangle size={10} /> 緊急警戒
+                        </span>
+                      )}
+                      {item.isDisaster && (
+                        <span className="text-[10px] tracking-wider px-2 py-1 border border-orange-500/50 text-orange-400 flex items-center gap-1 bg-orange-500/10">
+                          <Flame size={10} /> 災害・火災
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-500 border-b border-gray-800 pb-1 max-w-[150px] truncate">
+                      {item.category}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg text-gray-200 font-medium leading-relaxed group-hover:text-white transition-colors">
+                    {item.title}
+                  </h3>
+                  
+                  <p className="text-sm text-gray-400 leading-loose flex-grow">
+                    {item.summary}
+                  </p>
+
+                  <div className="flex justify-between items-center mt-4 pt-4 border-t border-white/5">
+                    <span className="text-xs text-gray-500 flex items-center gap-2">
+                      <Activity size={12} /> {item.source}
+                    </span>
+                    <button 
+                      onClick={() => setSelectedItem(item)}
+                      className="text-[#d4af37] md:opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs tracking-wider border border-[#d4af37]/20 hover:border-[#d4af37] px-3 py-1 rounded-sm bg-black/20"
+                    >
+                      詳細・根拠ソースを見る <ExternalLink size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {!loading && data.length > 0 && filteredData.length === 0 && (
+             <div className="text-center text-gray-500 py-12 text-sm tracking-widest">
+               該当するフィルターの情報はありません。
+             </div>
+          )}
+        </main>
+      </div>
+
+      {/* Modal for Details with Source Links */}
+      {selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+          <div className="bg-[#111] border border-[#d4af37]/40 w-full max-w-2xl max-h-[85vh] overflow-y-auto custom-scrollbar relative rounded-sm shadow-2xl shadow-black">
+            
+            <div className="sticky top-0 bg-[#111] border-b border-[#d4af37]/20 p-4 flex justify-between items-center z-10">
+              <span className="text-xs tracking-widest text-[#d4af37] font-cinzel flex items-center gap-2">
+                <Globe size={14} className="text-[#d4af37]" /> REAL-TIME SEARCH INTELLIGENCE
+              </span>
+              <button 
+                onClick={() => setSelectedItem(null)}
+                className="text-gray-500 hover:text-white transition-colors border border-white/10 p-1 rounded-sm hover:border-white/30"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8 flex flex-col gap-6">
+              <div className="flex flex-wrap gap-3">
+                <span className="text-xs tracking-wider px-3 py-1 border border-white/20 text-gray-400">
+                  {selectedItem.date}
+                </span>
+                {selectedItem.isOfficial && (
+                  <span className="text-xs tracking-wider px-3 py-1 border border-[#d4af37]/50 text-[#d4af37] flex items-center gap-1 bg-[#d4af37]/10">
+                    <Building2 size={12} /> 公式情報
+                  </span>
+                )}
+                {selectedItem.isUrgent && (
+                  <span className="text-xs tracking-wider px-3 py-1 border border-red-500/50 text-red-400 flex items-center gap-1 bg-red-500/10">
+                    <AlertTriangle size={12} /> 緊急警戒
+                  </span>
+                )}
+                {selectedItem.isDisaster && (
+                  <span className="text-xs tracking-wider px-3 py-1 border border-orange-500/50 text-orange-400 flex items-center gap-1 bg-orange-500/10">
+                    <Flame size={12} /> 災害・火災
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-2xl font-medium text-white leading-relaxed">
+                {selectedItem.title}
+              </h2>
+
+              <div className="flex items-center gap-4 text-sm text-[#c9b168] flex-wrap">
+                <span className="flex items-center gap-1"><Activity size={14} /> 情報元: {selectedItem.source}</span>
+                <span className="opacity-50">|</span>
+                <span>カテゴリ: {selectedItem.category}</span>
+              </div>
+
+              <div className="w-full h-px gold-gradient opacity-30 my-2" />
+
+              <div className="text-gray-300 text-sm md:text-base leading-loose whitespace-pre-wrap">
+                {selectedItem.content || selectedItem.summary}
+              </div>
+
+              {selectedItem.source_url && (
+                <div className="mt-6 p-4 border border-[#d4af37]/20 bg-[#d4af37]/5 rounded-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-[#c9b168] tracking-widest font-semibold flex items-center gap-1.5">
+                      <Globe size={12} /> 実際の情報根拠・ニュースソース
+                    </p>
+                    <p className="text-xs text-gray-500 truncate max-w-[300px] md:max-w-[400px]">
+                      {selectedItem.source_url}
+                    </p>
+                  </div>
+                  <a 
+                    href={selectedItem.source_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#d4af37]/10 hover:bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/30 text-xs tracking-widest hover:border-[#d4af37] transition-all whitespace-nowrap"
+                  >
+                    実際のWebサイトを開く <ExternalLink size={12} />
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sub-component for Stats Cards
+function StatCard({ title, value, unit, active, highlight, alert }) {
+  let borderColor = "border-white/10";
+  if (highlight && active) borderColor = "border-[#d4af37]/50";
+  if (alert && active) borderColor = "border-red-500/30";
+  if (!highlight && !alert && active) borderColor = "border-white/30";
+
+  return (
+    <div className={`p-5 bg-black/40 border-t-2 border-x border-b ${borderColor} flex flex-col gap-3 relative overflow-hidden transition-colors`}>
+      {(highlight && active) && <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-[#d4af37]/5 to-transparent pointer-events-none" />}
+      {(alert && active) && <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-red-500/5 to-transparent pointer-events-none" />}
+      
+      <span className="text-xs tracking-widest text-gray-500 relative z-10">{title}</span>
+      <div className="flex items-baseline gap-2 relative z-10">
+        <span className="text-3xl font-light font-cinzel text-white tracking-wider">{value}</span>
+        <span className="text-xs text-gray-600">{unit}</span>
+      </div>
+    </div>
+  );
+}
