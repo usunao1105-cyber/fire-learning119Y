@@ -180,11 +180,27 @@
         </div>
       </div>
 
-      <!-- Loading Indicator -->
-      <div id="loadingScreen" class="hidden flex flex-col items-center justify-center h-64 text-[#d4af37] gap-4">
-        <i data-lucide="loader-2" class="w-9 h-9 animate-spin text-[#d4af37]"></i>
-        <p class="text-xs tracking-[0.2em] animate-pulse">CONNECTING TO GOOGLE SEARCH ENGINE...</p>
-        <p class="text-xs text-gray-500 tracking-wider">日本の直近のニュース・発表資料を検索し、信頼情報をまとめています</p>
+      <!-- Loading Indicator with Progressive Step Progress -->
+      <div id="loadingScreen" class="hidden flex flex-col items-center justify-center min-h-[280px] text-[#d4af37] gap-6">
+        <div class="relative flex items-center justify-center">
+          <div class="absolute w-16 h-16 border-2 border-[#d4af37]/20 rounded-full"></div>
+          <div class="absolute w-16 h-16 border-t-2 border-[#d4af37] rounded-full animate-spin"></div>
+          <i data-lucide="search" class="w-6 h-6 text-[#d4af37]"></i>
+        </div>
+        
+        <div class="text-center space-y-4 max-w-md w-full px-6">
+          <p class="text-xs tracking-[0.2em] font-cinzel text-gray-500">GEMINI SEARCH GROUNDING ENGINE</p>
+          <h3 id="loadingStepTitle" class="text-sm font-medium tracking-widest text-white transition-all duration-300">情報収集の準備をしています...</h3>
+          
+          <!-- Visual Process Steps -->
+          <div class="flex items-center justify-between text-[10px] text-gray-600 border-t border-white/5 pt-4 mt-2">
+            <span id="stepIndicator1" class="transition-colors duration-300 text-[#d4af37]">① ウェブ検索</span>
+            <span class="text-gray-800">→</span>
+            <span id="stepIndicator2" class="transition-colors duration-300">② ソース選定</span>
+            <span class="text-gray-800">→</span>
+            <span id="stepIndicator3" class="transition-colors duration-300">③ 情報整理 & 分析</span>
+          </div>
+        </div>
       </div>
 
       <!-- Cards Grid container -->
@@ -249,6 +265,7 @@
     let dataState = [];
     let currentFilter = 'all';
     let fetchCount = 0;
+    let loadingInterval = null;
 
     // Initialize Lucide Icons
     window.addEventListener('DOMContentLoaded', () => {
@@ -290,23 +307,57 @@
       });
     }
 
+    // --- Loading UI Animations ---
+    function startLoadingAnimation() {
+      const stepTitle = document.getElementById('loadingStepTitle');
+      const step1 = document.getElementById('stepIndicator1');
+      const step2 = document.getElementById('stepIndicator2');
+      const step3 = document.getElementById('stepIndicator3');
+      
+      let duration = 0;
+      
+      // Reset indicators
+      step1.className = "transition-colors duration-300 text-[#d4af37]";
+      step2.className = "transition-colors duration-300 text-gray-600";
+      step3.className = "transition-colors duration-300 text-gray-600";
+      stepTitle.innerText = "日本の消防・防災の最新情報をウェブ検索中...";
+
+      loadingInterval = setInterval(() => {
+        duration += 1;
+        
+        if (duration === 4) {
+          stepTitle.innerText = "総務省消防庁や各ニュースサイトのデータを選定中...";
+          step1.className = "transition-colors duration-300 text-gray-500";
+          step2.className = "transition-colors duration-300 text-[#d4af37]";
+        } else if (duration === 8) {
+          stepTitle.innerText = "信頼性をファクトチェックして情報を整理・要約中...";
+          step2.className = "transition-colors duration-300 text-gray-500";
+          step3.className = "transition-colors duration-300 text-[#d4af37]";
+        } else if (duration === 12) {
+          stepTitle.innerText = "レスポンスデータを精査し、ダッシュボードを構築しています...";
+        } else if (duration > 15 && duration % 5 === 0) {
+          stepTitle.innerText = "データ解析完了間近です。ブラウザ描画を準備しています...";
+        }
+      }, 1000);
+    }
+
+    function stopLoadingAnimation() {
+      if (loadingInterval) {
+        clearInterval(loadingInterval);
+        loadingInterval = null;
+      }
+    }
+
     // --- API Client ---
     async function generateFireData() {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
       
+      // より検索ノイズを減らし、AIがスムーズに回答を出せるようにプロンプトを整理・最適化
       const prompt = `
-      あなたは消防・防災情報の専門アナリストです。
-      Google検索を利用して、日本の消防・防災・災害に関連する「実際の最新ニュース」や「総務省消防庁等の公式発表・通知」を収集・整理してください。架空の情報ではなく、現実に報道されているニュースや公式文書に基づいた情報を整理してください。
-      特に本日（2026年5月18日前後）の最新情報や、ここ最近の重要な発表を優先してください。
+      日本の直近の消防、防災、災害関連の「実際の最新ニュース」や「総務省消防庁の公式発表・通知」をGoogle検索から数件抽出して整理してください。
+      架空の情報ではなく、現実にニュース報道や官公庁発表として存在する内容を要約して出力してください。
       
-      【収集対象の優先順位】
-      1. 総務省消防庁の公式発表・通知・報告書
-      2. 大規模火災・林野火災・自然災害のリアルタイムニュース
-      3. 消防法改正・規制変更に関する直近の動き
-      4. 防火・防災の行政施策や注意喚起情報
-      5. 消防技術・設備の最新動向
-      
-      集めた最新情報を8〜10件、必ず指定のJSONスキーマに従って整理・変換して出力してください。
+      出力は必ず指定のJSONスキーマに従う配列形式とし、それ以外の文章は一切含めないでください。
       `;
 
       const payload = {
@@ -322,14 +373,14 @@
                 id: { type: "STRING" },
                 title: { type: "STRING", description: "実際のニュースや公式発表のタイトル" },
                 date: { type: "STRING", description: "発表日または報道日 (YYYY-MM-DD)" },
-                source: { type: "STRING", description: "実際の情報元 (例: 総務省消防庁、〇〇市消防局、〇〇新聞)" },
-                category: { type: "STRING", description: "カテゴリ" },
-                summary: { type: "STRING", description: "ニュースの簡潔な要約(80文字程度)" },
-                content: { type: "STRING", description: "ニュースの詳細な本文（300文字程度。実際の経緯や数値、対策などを交えて具体的に記載してください）" },
-                source_url: { type: "STRING", description: "情報の根拠となった実際のWebサイトやニュースソースのURL（検索結果のURL）" },
-                isOfficial: { type: "BOOLEAN" },
-                isUrgent: { type: "BOOLEAN" },
-                isDisaster: { type: "BOOLEAN" }
+                source: { type: "STRING", description: "実際の情報元（例：総務省消防庁、〇〇市消防局、共同通信など）" },
+                category: { type: "STRING", description: "カテゴリ分類" },
+                summary: { type: "STRING", description: "ニュースの簡潔な要約（80文字程度）" },
+                content: { type: "STRING", description: "ニュースの詳細な内容（250〜350文字程度で具体的に記載してください）" },
+                source_url: { type: "STRING", description: "情報の根拠となった実際のWebサイトやニュースのURL（無ければ主要な参照先URL）" },
+                isOfficial: { type: "BOOLEAN", description: "省庁や自治体の公式発表であればtrue" },
+                isUrgent: { type: "BOOLEAN", description: "現在進行中や緊急度が高いものならtrue" },
+                isDisaster: { type: "BOOLEAN", description: "火災、大雨、地震などの災害情報ならtrue" }
               },
               required: ["id", "title", "date", "source", "category", "summary", "content", "source_url", "isOfficial", "isUrgent", "isDisaster"]
             }
@@ -338,7 +389,7 @@
       };
 
       const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-      const retries = [1000, 2000, 4000, 8000, 16000];
+      const retries = [1000, 2000, 4000, 8000, 16000]; // 規定の指数バックオフ間隔
 
       for (let i = 0; i <= retries.length; i++) {
         try {
@@ -393,6 +444,9 @@
       errorArea.classList.add('hidden');
       loadingScreen.classList.remove('hidden');
 
+      // Start the progressive step messages
+      startLoadingAnimation();
+
       try {
         const result = await generateFireData();
         dataState = result;
@@ -405,11 +459,12 @@
         cardsGrid.classList.remove('hidden');
       } catch (err) {
         console.error(err);
-        document.getElementById('errorMessage').innerText = "最新情報の取得に失敗しました。時間をおいて再度お試しください。";
+        document.getElementById('errorMessage').innerText = "最新情報の取得に失敗しました。一時的に通信が混雑しているか、検索がタイムアウトした可能性があります。少し時間を置いてから再度お試しください。";
         errorArea.classList.remove('hidden');
         loadingScreen.classList.add('hidden');
         emptyScreen.classList.remove('hidden');
       } finally {
+        stopLoadingAnimation();
         fetchBtn.disabled = false;
         btnText.innerText = "実際の最新情報を検索・収集する";
       }
