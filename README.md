@@ -169,7 +169,7 @@ e-Learning119Y  消防業務
 
     <div class="card">
       <div class="lesson-title">Lesson 12</div>
-      <div class="lesson-desc">分娩介助・助産業務</div>
+      <div class="lesson-desc">消防ニュース検索</div>
       <a href="lesson12/index.html" class="button">▶ 学習する</a>
     </div>
 
