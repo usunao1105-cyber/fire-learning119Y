@@ -324,7 +324,7 @@
     let myColor = "blue"; 
     let watchId = null;
     let pendingImageBase64 = null; 
-    let fullChatLog = []; // テキスト出力用に全チャット履歴を保持
+    let fullChatLog = []; 
 
     const setupScreen = document.getElementById('setup-screen');
     const joinScreen = document.getElementById('join-screen');
@@ -537,7 +537,6 @@
               };
               const pinBgColor = colorCodeMap[data.color] || '#3b82f6';
 
-              // ★変更：マーカーを大きくし、白背景＋カラー太字の吹き出しデザインにして視認性を向上
               const markerHtml = `
                 <div style="
                   position: absolute;
@@ -595,7 +594,6 @@
           if (change.type === "added") {
             const data = change.doc.data();
             
-            // テキスト出力用にログを保存する
             let logTime = "";
             if (data.timestamp) {
               const dateObj = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
@@ -779,7 +777,6 @@
 
     // === UI制御関連 ===
     
-    // チャットログをコピーする機能
     document.getElementById('btn-export-chat').addEventListener('click', () => {
       if (fullChatLog.length === 0) {
         alert("コピーする通信ログがありません。");
@@ -854,23 +851,48 @@
     document.getElementById('btn-cancel-leave').addEventListener('click', () => {
       modalLeave.classList.add('hidden');
     });
-    document.getElementById('btn-confirm-leave').addEventListener('click', async () => {
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-      try {
-        await deleteDoc(doc(db, getCollectionPath('locations'), currentUser.uid));
-        const leaveMessage = currentRole === 'hq' ? '本部が運用からログアウトしました。' : `${myName} がログアウトしました。`;
-        await addDoc(collection(db, getCollectionPath('chat')), {
-          senderId: 'system',
-          senderName: 'システム',
-          text: leaveMessage,
-          timestamp: serverTimestamp()
-        });
-        
-        await signOut(auth);
-      } catch (e) {
-        console.error("退出エラー", e);
+    
+    // ★追加・修正：タイムアウト付きの強力な強制ログアウト処理
+    document.getElementById('btn-confirm-leave').addEventListener('click', async (e) => {
+      // ボタンを無効化して連打を防ぐ
+      const btn = e.target;
+      btn.disabled = true;
+      btn.textContent = "処理中...";
+
+      // GPSトラッキングを強制停止
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
       }
-      window.location.href = window.location.href.split('?')[0];
+
+      try {
+        const logoutTasks = async () => {
+          if (currentUser) {
+            await deleteDoc(doc(db, getCollectionPath('locations'), currentUser.uid));
+            const leaveMessage = currentRole === 'hq' ? '本部が運用からログアウトしました。' : `${myName} がログアウトしました。`;
+            await addDoc(collection(db, getCollectionPath('chat')), {
+              senderId: 'system',
+              senderName: 'システム',
+              text: leaveMessage,
+              timestamp: serverTimestamp()
+            });
+            await signOut(auth);
+          }
+        };
+
+        // 電波が悪い現場に備え、最大3秒で通信を打ち切って強制退出する（フリーズ防止）
+        await Promise.race([
+          logoutTasks(),
+          new Promise(resolve => setTimeout(resolve, 3000))
+        ]);
+
+      } catch (error) {
+        console.error("退出エラー", error);
+      } finally {
+        // パラメータ(事案ID)を消して最初の画面にリダイレクト（履歴に残さない）
+        const baseUrl = window.location.href.split('?')[0];
+        window.location.replace(baseUrl);
+      }
     });
 
     // 初期化実行
